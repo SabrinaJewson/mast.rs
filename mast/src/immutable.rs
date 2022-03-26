@@ -18,7 +18,7 @@ use {
 /// This asset outputs an `&mut V` for flexibility reasons,
 /// but you should not be mutating its value.
 ///
-/// [`constant`]: crate::constant
+/// [`constant`]: crate::constant()
 #[derive(Debug, Clone, Copy)]
 pub struct Immutable<V, T, S> {
     value: V,

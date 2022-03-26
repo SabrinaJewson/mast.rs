@@ -13,6 +13,9 @@
 
 use crate::time::Time;
 
+mod map;
+pub use map::Map;
+
 /// The base trait of [`Asset`], tied to a specific lifetime.
 ///
 /// This trait should be implemented for any lifetime `'a`.
@@ -56,6 +59,62 @@ pub trait Asset: for<'a> AssetLifetime<'a> {
     ///
     /// This can be useful to determine which files to watch when implementing a watch mode.
     fn sources(&mut self, walker: &mut dyn SourceWalker<Self>);
+
+    /// Map the resulting value of an asset with a function.
+    ///
+    /// When using this function,
+    /// you will often encounter problems
+    /// if you try to return a value that has a lifetime depending on the input's lifetime.
+    /// For example, the following does not compile:
+    ///
+    /// ```compile_fail
+    /// use ::mast::{self, Asset};
+    ///
+    /// let asset = mast::constant(5)
+    ///     .map(|val: &mut u32| -> &mut u32 { val });
+    /// # #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    /// # struct Time;
+    /// # impl mast::Time for Time {
+    /// #     fn earliest() -> Self { Self }
+    /// # }
+    /// # fn type_infer(_: impl Asset<Time = Time, Source = ()>) {}
+    /// # type_infer(asset);
+    /// ```
+    ///
+    /// To resolve this,
+    /// you can use a helper funnelling function:
+    ///
+    /// ```
+    /// use ::mast::{self, Asset};
+    ///
+    /// fn funnel<F: FnMut(&mut u32) -> &mut u32>(f: F) -> F { f }
+    ///
+    /// let asset = mast::constant(5)
+    ///     .map(funnel(|val| val));
+    /// # #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    /// # struct Time;
+    /// # impl mast::Time for Time {
+    /// #     fn earliest() -> Self { Self }
+    /// # }
+    /// # fn type_infer(_: impl Asset<Time = Time, Source = ()>) {}
+    /// # type_infer(asset);
+    /// ```
+    ///
+    /// This will force `rustc` to make type inference on your closure work differently,
+    /// allowing it compile.
+    /// The [`::higher-order-closure`] library
+    /// can help to reduce the boilerplate of this pattern.
+    ///
+    /// No sanity or stability guarantees are provided if you override this function.
+    ///
+    /// [`::higher-order-closure`]: https://docs.rs/higher-order-closure
+    fn map<F>(self, mapper: F) -> Map<Self, F>
+    where
+        Self: Sized,
+        F: for<'a> map::Mapper<'a, Self>,
+    {
+        Map::new(self, mapper)
+    }
 }
 
 /// A helper "trait alias" for `for<'a> FnMut(<A as AssetLifetime<'a>>::Source)`.

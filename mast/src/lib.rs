@@ -16,8 +16,11 @@ extern crate alloc;
 extern crate std;
 
 pub mod time;
+#[doc(no_inline)]
+pub use time::Time;
 
 pub mod asset;
+#[doc(no_inline)]
 pub use asset::Asset;
 
 mod constant;
