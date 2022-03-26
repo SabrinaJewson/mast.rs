@@ -1,0 +1,18 @@
+[package]
+name = "mast"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.59.0"
+description = "A flexible build system configured by Rust code"
+repository = "https://github.com/SabrinaJewson/mast.rs"
+license = "MIT"
+keywords = ["build system", "task runner", "make", "gulp"]
+categories = ["caching", "filesystem"]
+
+[dependencies]
+
+[features]
+default = []
+
+alloc = []
+std = ["alloc"]

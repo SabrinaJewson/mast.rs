@@ -1,0 +1,27 @@
+//! Mast is a flexible build system configured by Rust code.
+#![warn(
+    noop_method_call,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_import_braces,
+    unused_lifetimes,
+    unused_qualifications,
+    clippy::pedantic
+)]
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
+
+pub mod time;
+
+pub mod asset;
+pub use asset::Asset;
+
+mod constant;
+pub use constant::{constant, Constant};
+
+mod immutable;
+pub use immutable::Immutable;
