@@ -16,6 +16,9 @@ use crate::time::Time;
 mod map;
 pub use map::Map;
 
+mod map_source;
+pub use map_source::MapSource;
+
 /// The base trait of [`Asset`], tied to a specific lifetime.
 ///
 /// This trait should be implemented for any lifetime `'a`.
@@ -114,6 +117,18 @@ pub trait Asset: for<'a> AssetLifetime<'a> {
         F: for<'a> map::Mapper<'a, Self>,
     {
         Map::new(self, mapper)
+    }
+
+    /// Map the [source](AssetLifetime::Source) type of this asset.
+    ///
+    /// This is useful when combining multiple asset kinds,
+    /// each with different source types.
+    fn map_source<F>(self, mapper: F) -> MapSource<Self, F>
+    where
+        Self: Sized,
+        F: for<'a> map_source::SourceMapper<'a, Self>,
+    {
+        MapSource::new(self, mapper)
     }
 }
 

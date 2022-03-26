@@ -56,6 +56,3 @@ where
 {
     type Output = O;
 }
-
-pub trait Outlives<'a, ImplicitBounds = &'a Self> {}
-impl<'a, T: ?Sized> Outlives<'a> for T {}
