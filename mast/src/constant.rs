@@ -1,6 +1,6 @@
 use {
     crate::{
-        asset::{Asset, AssetLifetime, SourceWalker},
+        asset::{self, Asset},
         time::Time,
     },
     ::core::marker::PhantomData,
@@ -41,22 +41,17 @@ impl<V, T, S> Constant<V, T, S> {
     }
 }
 
-impl<'a, V, T: Time, S> AssetLifetime<'a> for Constant<V, T, S> {
-    type Output = &'a mut V;
-
-    fn generate(&'a mut self) -> Self::Output {
+impl<V, T: Time, S: for<'a> asset::Source<'a>> Asset for Constant<V, T, S> {
+    type Output = fn(&()) -> &mut V;
+    fn generate(&mut self) -> &mut V {
         &mut self.value
     }
 
-    type Source = S;
-}
-
-impl<V, T: Time, S> Asset for Constant<V, T, S> {
     type Time = T;
-
     fn last_modified(&mut self) -> Self::Time {
         T::earliest()
     }
 
-    fn sources(&mut self, _walker: &mut dyn SourceWalker<Self>) {}
+    type Source = S;
+    fn sources(&mut self, _walker: asset::SourceWalker<'_, Self>) {}
 }
