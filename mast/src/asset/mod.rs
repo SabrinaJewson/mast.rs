@@ -14,6 +14,9 @@ pub use map::Map;
 mod map_source;
 pub use map_source::MapSource;
 
+mod flatten;
+pub use flatten::Flatten;
+
 pub mod zip;
 #[doc(no_inline)]
 pub use zip::zip;
@@ -131,6 +134,21 @@ pub trait Asset {
         F: map_source::SourceMapper<Self>,
     {
         MapSource::new(self, mapper)
+    }
+
+    /// Flatten the layering of an asset that outputs another asset.
+    ///
+    /// This is useful when dealing with dynamically-generated assets,
+    /// e.g. a file which contains the path of another file.
+    ///
+    /// No sanity or stability guarantees are provided if you override this function.
+    fn flatten(self) -> Flatten<Self>
+    where
+        Self: Sized,
+        for<'a> <Self::Output as Output<'a>>::Type:
+            Asset<Time = Self::Time, Source = Self::Source> + flatten::FreeOutput,
+    {
+        Flatten::new(self)
     }
 }
 
