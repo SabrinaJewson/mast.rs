@@ -2,6 +2,12 @@
 
 use crate::time::Time;
 
+mod constant;
+pub use constant::{constant, Constant};
+
+mod immutable;
+pub use immutable::Immutable;
+
 mod map;
 pub use map::Map;
 
@@ -64,9 +70,9 @@ pub trait Asset {
     /// For example, the following does not compile:
     ///
     /// ```compile_fail
-    /// use ::mast::{self, Asset};
+    /// use ::mast::asset::{self, Asset};
     ///
-    /// let asset = mast::constant(5)
+    /// let asset = asset::constant(5)
     ///     .map(|val: &mut u32| -> &mut u32 { val });
     /// # #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     /// # struct Time;
@@ -81,11 +87,11 @@ pub trait Asset {
     /// you can use a helper funnelling function:
     ///
     /// ```
-    /// use ::mast::{self, Asset};
+    /// use ::mast::asset::{self, Asset};
     ///
     /// fn funnel<F: FnMut(&mut u32) -> &mut u32>(f: F) -> F { f }
     ///
-    /// let asset = mast::constant(5)
+    /// let asset = asset::constant(5)
     ///     .map(funnel(|val| val));
     /// # #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     /// # struct Time;
@@ -190,7 +196,7 @@ fn is_object_safe() {
             Self
         }
     }
-    let mut asset = crate::constant(5).map(|x: &mut _| *x);
+    let mut asset = constant(5).map(|x: &mut _| *x);
     let _: &mut dyn Asset<Output = fn(&()) -> u32, Time = Time, Source = fn(&()) -> ()> =
         &mut asset;
 }

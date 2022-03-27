@@ -17,7 +17,7 @@ use {
 /// use ::mast::asset::{self, Asset};
 ///
 /// // Zip an array
-/// let asset = asset::zip([mast::constant(1), mast::constant(2)])
+/// let asset = asset::zip([asset::constant(1), asset::constant(2)])
 ///     .map(|[a, b]: [&mut u32; 2]| {
 ///         assert_eq!(*a, 1);
 ///         assert_eq!(*b, 2);
@@ -25,7 +25,7 @@ use {
 /// # type_infer(asset).generate();
 ///
 /// // Zip a tuple
-/// let asset = asset::zip((mast::constant(1), mast::constant("foo")))
+/// let asset = asset::zip((asset::constant(1), asset::constant("foo")))
 ///     .map(|(a, b): (&mut u32, &mut &'static str)| {
 ///         assert_eq!(*a, 1);
 ///         assert_eq!(*b, "foo");

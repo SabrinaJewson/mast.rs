@@ -18,7 +18,7 @@ use {
 /// ```
 /// use ::mast::asset::{self, Asset};
 ///
-/// let asset = asset::zip_all(vec![mast::constant(0), mast::constant(1)])
+/// let asset = asset::zip_all(vec![asset::constant(0), asset::constant(1)])
 ///     .map(|iter: asset::zip_all::Outputs<core::slice::IterMut<'_, _>>| {
 ///         for (i, item @ &mut u32) in iter.enumerate() {
 ///             assert_eq!(*item, i);

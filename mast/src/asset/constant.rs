@@ -12,7 +12,7 @@ use {
 /// this should only be used for values that can't change between invocations of the binary.
 /// If your value is determined at runtime but immutable
 /// (like command-line arguments)
-/// then use [`Immutable`](crate::Immutable) instead.
+/// then use [`Immutable`](super::Immutable) instead.
 ///
 /// The resulting asset outputs an `&mut V` for flexibility reasons,
 /// but you should not be mutating its value.
