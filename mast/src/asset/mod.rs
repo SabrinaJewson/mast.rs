@@ -8,6 +8,14 @@ pub use map::Map;
 mod map_source;
 pub use map_source::MapSource;
 
+pub mod zip;
+#[doc(no_inline)]
+pub use zip::zip;
+
+pub mod zip_all;
+#[doc(no_inline)]
+pub use zip_all::zip_all;
+
 /// A mutable resource with a known modification time.
 #[must_use]
 pub trait Asset {

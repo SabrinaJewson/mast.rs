@@ -6,6 +6,8 @@
     unused_import_braces,
     unused_lifetimes,
     unused_qualifications,
+    missing_docs,
+    missing_debug_implementations,
     clippy::pedantic
 )]
 #![no_std]
