@@ -1,4 +1,4 @@
-use super::{Asset, Output, SourceWalker};
+use super::{Asset, FixedOutput, Output, SourceWalker};
 
 /// An asset that has been flattened, created by [`Asset::flatten`]
 #[derive(Debug, Clone, Copy)]
@@ -16,9 +16,9 @@ impl<A> Flatten<A> {
 impl<A> Asset for Flatten<A>
 where
     A: Asset,
-    for<'a> <A::Output as Output<'a>>::Type: FreeOutput<Time = A::Time, Source = A::Source>,
+    for<'a> <A::Output as Output<'a>>::Type: FixedOutput<Time = A::Time, Source = A::Source>,
 {
-    type Output = fn(&()) -> <<A::Output as Output<'_>>::Type as FreeOutput>::FreeOutput;
+    type Output = fn(&()) -> <<A::Output as Output<'_>>::Type as FixedOutput>::FixedOutput;
     fn generate(&mut self) -> <Self::Output as Output<'_>>::Type {
         self.asset.generate().generate()
     }
@@ -36,16 +36,4 @@ where
         self.asset.sources(walker);
         self.asset.generate().sources(walker);
     }
-}
-
-/// An asset whose `Output` only contains free variables,
-/// i.e. does not depend on the asset's lifetime.
-pub trait FreeOutput: Asset<Output = fn(&()) -> <Self as FreeOutput>::FreeOutput> {
-    type FreeOutput;
-}
-impl<A, O> FreeOutput for A
-where
-    A: ?Sized + Asset<Output = fn(&()) -> O>,
-{
-    type FreeOutput = O;
 }

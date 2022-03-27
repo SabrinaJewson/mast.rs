@@ -17,6 +17,9 @@ pub use map_source::MapSource;
 mod flatten;
 pub use flatten::Flatten;
 
+mod cache;
+pub use cache::Cache;
+
 pub mod zip;
 #[doc(no_inline)]
 pub use zip::zip;
@@ -146,9 +149,23 @@ pub trait Asset {
     where
         Self: Sized,
         for<'a> <Self::Output as Output<'a>>::Type:
-            Asset<Time = Self::Time, Source = Self::Source> + flatten::FreeOutput,
+            FixedOutput<Time = Self::Time, Source = Self::Source>,
     {
         Flatten::new(self)
+    }
+
+    /// Cache the result of this asset based on its modification time.
+    ///
+    /// With this combinator,
+    /// the inner asset won't be regenerated
+    /// unless it is newer than the cached version.
+    ///
+    /// No sanity or stability guarantees are provided if you override this function.
+    fn cache(self) -> Cache<Self>
+    where
+        Self: Sized + FixedOutput,
+    {
+        Cache::new(self)
     }
 }
 
@@ -243,3 +260,20 @@ macro_rules! impl_for_refs {
 impl_for_refs!(&mut A);
 #[cfg(feature = "alloc")]
 impl_for_refs!(alloc::boxed::Box<A>);
+
+/// An asset whose `Output` does not depend on the lifetime of the asset passed to [`generate`].
+///
+/// This trait is automatically blanket-implemented
+/// for any appropriate asset.
+///
+/// [`generate`]: Asset::generate
+pub trait FixedOutput: Asset<Output = fn(&()) -> <Self as FixedOutput>::FixedOutput> {
+    /// The asset's output type, independent of any input lifetimes.
+    type FixedOutput;
+}
+impl<A, O> FixedOutput for A
+where
+    A: ?Sized + Asset<Output = fn(&()) -> O>,
+{
+    type FixedOutput = O;
+}
