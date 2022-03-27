@@ -31,7 +31,7 @@ where
 
     type Source = A::Source;
     fn sources(&mut self, walker: SourceWalker<'_, Self>) {
-        self.asset.sources(&mut |source| walker(source));
+        self.asset.sources(walker);
     }
 }
 

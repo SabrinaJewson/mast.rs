@@ -10,6 +10,7 @@
     missing_debug_implementations,
     clippy::pedantic
 )]
+#![cfg_attr(doc_nightly, feature(doc_cfg))]
 #![no_std]
 
 #[cfg(feature = "alloc")]
@@ -24,3 +25,6 @@ pub use time::Time;
 pub mod asset;
 #[doc(no_inline)]
 pub use asset::Asset;
+
+#[cfg(feature = "fs")]
+pub mod fs;

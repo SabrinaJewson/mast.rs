@@ -207,18 +207,28 @@ mod source {
 ///
 /// This is effectively an `&mut dyn for<'a> FnMut(<A::Source as Source<'a>>::Type)`
 /// but with some extra trickery applied to get rustc to accept it.
+/// To call it you must use:
+///
+/// ```ignore
+/// walker.visit(source);
+/// ```
 pub type SourceWalker<'source_walker, A> =
     &'source_walker mut dyn source_walker::SourceWalker<<A as Asset>::Source>;
 
 mod source_walker {
     use super::Source;
 
-    // Workaround for https://github.com/rust-lang/rust/issues/95331
-    pub trait SourceWalker<S: for<'a> Source<'a>>: for<'a> FnMut(<S as Source<'a>>::Type) {}
+    pub trait SourceWalker<S: for<'a> Source<'a>> {
+        fn visit(&mut self, source: <S as Source<'_>>::Type);
+    }
 
-    impl<F, S: for<'a> Source<'a>> SourceWalker<S> for F where
-        F: ?Sized + for<'a> FnMut(<S as Source<'a>>::Type)
+    impl<F, S: for<'a> Source<'a>> SourceWalker<S> for F
+    where
+        F: ?Sized + for<'a> FnMut(<S as Source<'a>>::Type),
     {
+        fn visit(&mut self, source: <S as Source<'_>>::Type) {
+            self(source);
+        }
     }
 }
 

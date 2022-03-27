@@ -10,9 +10,15 @@ keywords = ["build system", "task runner", "make", "gulp"]
 categories = ["caching", "filesystem"]
 
 [dependencies]
+once_cell = { version = "1.10.0", optional = true }
 
 [features]
 default = []
 
 alloc = []
 std = ["alloc"]
+
+fs = ["std", "once_cell"]
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "doc_nightly"]

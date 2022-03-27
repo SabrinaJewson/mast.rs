@@ -31,8 +31,16 @@ where
 
     type Source = <F as SourceMapper<A>>::Output;
     fn sources(&mut self, walker: SourceWalker<'_, Self>) {
-        self.asset
-            .sources(&mut |source| walker(self.mapper.call(source)));
+        fn funnel<A: Asset, F>(f: F) -> F
+        where
+            F: FnMut(<A::Source as Source<'_>>::Type),
+        {
+            f
+        }
+
+        self.asset.sources(&mut funnel::<A, _>(|source| {
+            walker.visit(self.mapper.call(source));
+        }));
     }
 }
 
