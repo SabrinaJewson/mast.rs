@@ -1,6 +1,6 @@
 use super::{funnel_source_walker, Asset, Output, Source, SourceWalker, Types};
 
-/// An asset whose [source](Asset::Source) is mapped to another type by a closure,
+/// An asset whose [source](Types::Source) is mapped to another type by a closure,
 /// created by [`Asset::map_source`].
 #[derive(Debug, Clone, Copy)]
 pub struct MapSource<A, F> {

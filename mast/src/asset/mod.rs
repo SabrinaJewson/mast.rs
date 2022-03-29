@@ -74,7 +74,7 @@ pub trait Asset: for<'a> Types<'a> {
     /// This can be used to avoid calling `generate` again, since that may be expensive.
     fn last_modified(&mut self) -> Self::Time;
 
-    /// Walk over each of the [source](Asset::Source)s of the asset.
+    /// Walk over each of the [source](Types::Source)s of the asset.
     ///
     /// This can be useful
     /// to determine which files to watch when implementing features like a watch mode.
@@ -147,7 +147,7 @@ pub trait Asset: for<'a> Types<'a> {
         Map::new(self, mapper)
     }
 
-    /// Map the [source](Asset::Source) type of this asset.
+    /// Map the [source](Types::Source) type of this asset.
     ///
     /// This is useful when combining multiple asset kinds,
     /// each with different source types.
