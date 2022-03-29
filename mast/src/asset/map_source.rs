@@ -1,4 +1,4 @@
-use super::{Asset, Output, Source, SourceWalker};
+use super::{funnel_source_walker, Asset, Output, Source, SourceWalker, Types};
 
 /// An asset whose [source](Asset::Source) is mapped to another type by a closure,
 /// created by [`Asset::map_source`].
@@ -14,13 +14,21 @@ impl<A, F> MapSource<A, F> {
     }
 }
 
+impl<'a, A, F> Types<'a> for MapSource<A, F>
+where
+    A: Asset,
+    F: for<'b> SourceMapper<'b, A>,
+{
+    type Output = Output<'a, A>;
+    type Source = <F as SourceMapper<'a, A>>::Output;
+}
+
 impl<A, F> Asset for MapSource<A, F>
 where
     A: Asset,
-    F: SourceMapper<A>,
+    F: for<'a> SourceMapper<'a, A>,
 {
-    type Output = A::Output;
-    fn generate(&mut self) -> <Self::Output as Output<'_>>::Type {
+    fn generate(&mut self) -> Output<'_, Self> {
         self.asset.generate()
     }
 
@@ -29,52 +37,25 @@ where
         self.asset.last_modified()
     }
 
-    type Source = <F as SourceMapper<A>>::Output;
-    fn sources(&mut self, walker: SourceWalker<'_, Self>) {
-        fn funnel<A: Asset, F>(f: F) -> F
-        where
-            F: FnMut(<A::Source as Source<'_>>::Type),
-        {
-            f
-        }
-
-        self.asset.sources(&mut funnel::<A, _>(|source| {
-            walker.visit(self.mapper.call(source));
-        }));
+    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+        self.asset.sources(&mut funnel_source_walker(|source| {
+            walker(self.mapper.call(source))
+        }))
     }
 }
 
-// Why do I have two layers of trait indirection here?
-// I have no idea.
-// But I'm not going to touch it, because it works.
-pub trait SourceMapper<A: Asset> {
-    type Output: for<'a> Source<'a>;
-    fn call<'a>(
-        &mut self,
-        source: <A::Source as Source<'a>>::Type,
-    ) -> <Self::Output as Source<'a>>::Type;
+pub trait SourceMapper<'a, A: Asset, ImpliedBounds = &'a A> {
+    type Output;
+    fn call(&mut self, source: Source<'a, A>) -> Self::Output;
 }
 
-impl<A, F> SourceMapper<A> for F
+impl<'a, A, F, O> SourceMapper<'a, A> for F
 where
     A: Asset,
-    F: ?Sized + for<'a> FnMut1<<A::Source as Source<'a>>::Type>,
-{
-    type Output = fn(&()) -> <F as FnMut1<<A::Source as Source<'_>>::Type>>::Output;
-    fn call<'a>(
-        &mut self,
-        source: <A::Source as Source<'a>>::Type,
-    ) -> <Self::Output as Source<'a>>::Type {
-        self(source)
-    }
-}
-
-pub trait FnMut1<I>: FnMut(I) -> <Self as FnMut1<I>>::Output {
-    type Output;
-}
-impl<F, I, O> FnMut1<I> for F
-where
-    F: ?Sized + FnMut(I) -> O,
+    F: FnMut(Source<'a, A>) -> O,
 {
     type Output = O;
+    fn call(&mut self, source: Source<'a, A>) -> Self::Output {
+        self(source)
+    }
 }

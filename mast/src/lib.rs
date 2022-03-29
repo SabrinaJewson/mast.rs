@@ -10,6 +10,7 @@
     missing_debug_implementations,
     clippy::pedantic
 )]
+#![allow(clippy::items_after_statements)]
 #![cfg_attr(doc_nightly, feature(doc_cfg))]
 #![no_std]
 

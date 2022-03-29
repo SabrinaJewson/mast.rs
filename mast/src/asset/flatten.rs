@@ -1,4 +1,4 @@
-use super::{Asset, FixedOutput, Output, SourceWalker};
+use super::{Asset, FixedOutput, Output, Source, SourceWalker, Types};
 
 /// An asset that has been flattened, created by [`Asset::flatten`]
 #[derive(Debug, Clone, Copy)]
@@ -13,13 +13,21 @@ impl<A> Flatten<A> {
     }
 }
 
+impl<'a, A> Types<'a> for Flatten<A>
+where
+    A: Asset,
+    for<'b, 'c> Output<'b, A>: FixedOutput<Time = A::Time> + Types<'c, Source = Source<'c, A>>,
+{
+    type Output = <Output<'a, A> as FixedOutput>::FixedOutput;
+    type Source = Source<'a, A>;
+}
+
 impl<A> Asset for Flatten<A>
 where
     A: Asset,
-    for<'a> <A::Output as Output<'a>>::Type: FixedOutput<Time = A::Time, Source = A::Source>,
+    for<'b, 'c> Output<'b, A>: FixedOutput<Time = A::Time> + Types<'c, Source = Source<'c, A>>,
 {
-    type Output = fn(&()) -> <<A::Output as Output<'_>>::Type as FixedOutput>::FixedOutput;
-    fn generate(&mut self) -> <Self::Output as Output<'_>>::Type {
+    fn generate(&mut self) -> Output<'_, Self> {
         self.asset.generate().generate()
     }
 
@@ -31,9 +39,9 @@ where
         )
     }
 
-    type Source = A::Source;
-    fn sources(&mut self, walker: SourceWalker<'_, Self>) {
-        self.asset.sources(walker);
-        self.asset.generate().sources(walker);
+    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+        self.asset.sources(walker)?;
+        self.asset.generate().sources(walker)?;
+        Ok(())
     }
 }

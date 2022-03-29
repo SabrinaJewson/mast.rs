@@ -4,7 +4,7 @@
 #![allow(clippy::iter_not_returning_iterator)]
 
 use {
-    super::{Asset, Output, SourceWalker},
+    super::{Asset, Output, SourceWalker, Types},
     crate::time::Time,
     ::core::iter::FusedIterator,
 };
@@ -44,9 +44,13 @@ pub struct ZipAll<S> {
     sequence: S,
 }
 
+impl<'a, S: Sequence> Types<'a> for ZipAll<S> {
+    type Output = Outputs<<S::Iter as SequenceIter<'a>>::Type>;
+    type Source = <S::Asset as Types<'a>>::Source;
+}
+
 impl<S: Sequence> Asset for ZipAll<S> {
-    type Output = fn(&()) -> Outputs<<S::Iter as SequenceIter<'_>>::Type>;
-    fn generate(&mut self) -> <Self::Output as Output<'_>>::Type {
+    fn generate(&mut self) -> Output<'_, Self> {
         Outputs(self.sequence.iter())
     }
 
@@ -59,11 +63,11 @@ impl<S: Sequence> Asset for ZipAll<S> {
             .unwrap_or_else(Time::earliest)
     }
 
-    type Source = <S::Asset as Asset>::Source;
-    fn sources(&mut self, walker: SourceWalker<'_, Self>) {
+    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
         for asset in self.sequence.iter() {
-            asset.sources(walker);
+            asset.sources(walker)?;
         }
+        Ok(())
     }
 }
 
@@ -165,7 +169,7 @@ where
     I: Iterator<Item = &'a mut A>,
     A: 'a + ?Sized + Asset,
 {
-    type Item = <A::Output as Output<'a>>::Type;
+    type Item = Output<'a, A>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next().map(Asset::generate)

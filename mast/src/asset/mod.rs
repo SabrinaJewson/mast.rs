@@ -28,20 +28,41 @@ pub mod zip_all;
 #[doc(no_inline)]
 pub use zip_all::zip_all;
 
+/// Helper to get the output type of an [`Asset`] for a specific lifetime.
+pub type Output<'a, A> = <A as Types<'a>>::Output;
+
+/// Helper to the get the source type of an [`Asset`] for a specific lifetime.
+pub type Source<'a, A> = <A as Types<'a>>::Source;
+
+/// The set of types associated with an [`Asset`] when a specific lifetime is applied.
+///
+/// This is used to work around the lack of GATs.
+// ImplicitBounds is cursed magic to get the equivalent of GATs' `where Self: 'a`
+pub trait Types<'a, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'a Self>> {
+    /// The value the asset gives once it is generated.
+    type Output;
+
+    /// The lowest-level source of where the asset obtains its value from.
+    ///
+    /// An asset that sources from the filesystem
+    /// will probably use a `&Path` here.
+    type Source;
+}
+
+mod bounds {
+    pub trait Sealed: Sized {}
+    #[allow(missing_debug_implementations)]
+    pub struct Bounds<T>(T);
+    impl<T> Sealed for Bounds<T> {}
+}
+
 /// A mutable resource with a known modification time.
 #[must_use]
-pub trait Asset {
-    /// The value the asset gives once it is generated.
-    ///
-    /// As a workaround for the lack of GATs,
-    /// this associated type must be a function pointer taking `&()` and giving the output type.
-    /// The lifetime in the `&()` type is the same lifetime as the one given to `generate`.
-    type Output: for<'a> Output<'a>;
-
+pub trait Asset: for<'a> Types<'a> {
     /// Generate the asset's value.
     ///
     /// This may perform computationally expensive work.
-    fn generate(&mut self) -> <Self::Output as Output<'_>>::Type;
+    fn generate(&mut self) -> Output<'_, Self>;
 
     /// The type this asset uses to keep track of time.
     type Time: Time;
@@ -53,20 +74,22 @@ pub trait Asset {
     /// This can be used to avoid calling `generate` again, since that may be expensive.
     fn last_modified(&mut self) -> Self::Time;
 
-    /// The lowest-level source of where the asset obtains its value from.
-    ///
-    /// As a workaround for the lack of GATs,
-    /// this associated type must be a function pointer taking `&()` and giving the output type.
-    /// The lifetime in the `&()` type is the same lifetime as the one given to `generate`.
-    ///
-    /// An asset that sources from the filesystem
-    /// will probably use a `fn(&()) -> &Path` here.
-    type Source: for<'a> Source<'a>;
-
     /// Walk over each of the [source](Asset::Source)s of the asset.
     ///
-    /// This can be useful to determine which files to watch when implementing a watch mode.
-    fn sources(&mut self, walker: SourceWalker<'_, Self>);
+    /// This can be useful
+    /// to determine which files to watch when implementing features like a watch mode.
+    ///
+    /// If you are having trouble calling this function due to unsatisfied trait bounds,
+    /// try wrapping the closure in [`funnel_source_walker`]:
+    ///
+    /// ```ignore
+    /// asset.sources(&mut funnel_source_walker(|source| handle(source)));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// This function can only error if the underlying [`SourceWalker`] wishes to exit early.
+    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error>;
 
     /// Map the resulting value of an asset with a function.
     ///
@@ -134,7 +157,7 @@ pub trait Asset {
     fn map_source<F>(self, mapper: F) -> MapSource<Self, F>
     where
         Self: Sized,
-        F: map_source::SourceMapper<Self>,
+        F: for<'a> map_source::SourceMapper<'a, Self>,
     {
         MapSource::new(self, mapper)
     }
@@ -148,8 +171,7 @@ pub trait Asset {
     fn flatten(self) -> Flatten<Self>
     where
         Self: Sized,
-        for<'a> <Self::Output as Output<'a>>::Type:
-            FixedOutput<Time = Self::Time, Source = Self::Source>,
+        for<'a> Output<'a, Self>: Asset + FixedOutput<Time = Self::Time>,
     {
         Flatten::new(self)
     }
@@ -169,88 +191,47 @@ pub trait Asset {
     }
 }
 
-/// The type constructor of an asset's [output](Asset::Output),
-/// represented as a function pointer of the form `fn(&()) -> O`
-/// where `O` is the actual output type.
-pub trait Output<'a>: output::Sealed<'a> {
-    /// The output type of the asset.
-    type Type;
-}
-
-impl<'a, F: FnOnce(&'a ()) -> O, O> Output<'a> for F {
-    type Type = O;
-}
-
-mod output {
-    pub trait Sealed<'a> {}
-    impl<'a, F: FnOnce(&'a ()) -> O, O> Sealed<'a> for F {}
-}
-
-/// The type constructor of an asset's [source](Asset::Source),
-/// represented as a function pointer of the form `fn(&()) -> S`
-/// where `S` is the actual source type.
-pub trait Source<'a>: source::Sealed<'a> {
-    /// The source type of the asset.
-    type Type;
-}
-
-impl<'a, F: FnOnce(&'a ()) -> O, O> Source<'a> for F {
-    type Type = O;
-}
-
-mod source {
-    pub trait Sealed<'a> {}
-    impl<'a, F: FnOnce(&'a ()) -> O, O> Sealed<'a> for F {}
-}
-
 /// The callback passed into [`Asset::sources`].
 ///
-/// This is effectively an `&mut dyn for<'a> FnMut(<A::Source as Source<'a>>::Type)`
-/// but with some extra trickery applied to get rustc to accept it.
-/// To call it you must use:
-///
-/// ```ignore
-/// walker.visit(source);
-/// ```
-pub type SourceWalker<'source_walker, A> =
-    &'source_walker mut dyn source_walker::SourceWalker<<A as Asset>::Source>;
-
-mod source_walker {
-    use super::Source;
-
-    pub trait SourceWalker<S: for<'a> Source<'a>> {
-        fn visit(&mut self, source: <S as Source<'_>>::Type);
-    }
-
-    impl<F, S: for<'a> Source<'a>> SourceWalker<S> for F
-    where
-        F: ?Sized + for<'a> FnMut(<S as Source<'a>>::Type),
-    {
-        fn visit(&mut self, source: <S as Source<'_>>::Type) {
-            self(source);
-        }
-    }
+/// This is a trait alias for `FnMut(Source<'_, A>) -> Result<(), E>`
+/// used to make implementing [`Asset`] more succinct.
+pub trait SourceWalker<A: ?Sized + Asset>:
+    FnMut(Source<'_, A>) -> Result<(), <Self as SourceWalker<A>>::Error>
+{
+    /// The error given when the `SourceWalker` wishes to exit early.
+    type Error;
 }
 
-#[test]
-fn is_object_safe() {
-    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    struct Time;
-    impl crate::Time for Time {
-        fn earliest() -> Self {
-            Self
-        }
-    }
-    let mut asset = constant(5).map(|x: &mut _| *x);
-    let _: &mut dyn Asset<Output = fn(&()) -> u32, Time = Time, Source = fn(&()) -> ()> =
-        &mut asset;
+impl<F, E, A> SourceWalker<A> for F
+where
+    A: ?Sized + Asset,
+    F: ?Sized + FnMut(Source<'_, A>) -> Result<(), E>,
+{
+    type Error = E;
+}
+
+/// An identity function that accepts and returns a [`SourceWalker`].
+///
+/// This is very useful when passing a [`SourceWalker`] into a function,
+/// because it makes rustc better at its type inference.
+#[must_use]
+pub fn funnel_source_walker<A, W, E>(walker: W) -> W
+where
+    A: ?Sized + Asset,
+    W: FnMut(Source<'_, A>) -> Result<(), E>,
+{
+    walker
 }
 
 macro_rules! impl_for_refs {
     ($($ty:ty),*) => { $(
+        impl<'a, A: Asset + ?Sized> Types<'a> for $ty {
+            type Output = Output<'a, A>;
+            type Source = Source<'a, A>;
+        }
+
         impl<A: Asset + ?Sized> Asset for $ty {
-            type Output = A::Output;
-            fn generate(&mut self) -> <Self::Output as Output<'_>>::Type {
+            fn generate(&mut self) -> Output<'_, Self> {
                 (**self).generate()
             }
 
@@ -259,8 +240,7 @@ macro_rules! impl_for_refs {
                 (**self).last_modified()
             }
 
-            type Source = A::Source;
-            fn sources(&mut self, walker: SourceWalker<'_, Self>) {
+            fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
                 (**self).sources(walker)
             }
         }
@@ -277,13 +257,15 @@ impl_for_refs!(alloc::boxed::Box<A>);
 /// for any appropriate asset.
 ///
 /// [`generate`]: Asset::generate
-pub trait FixedOutput: Asset<Output = fn(&()) -> <Self as FixedOutput>::FixedOutput> {
+pub trait FixedOutput:
+    Asset + for<'a> Types<'a, Output = <Self as FixedOutput>::FixedOutput>
+{
     /// The asset's output type, independent of any input lifetimes.
     type FixedOutput;
 }
 impl<A, O> FixedOutput for A
 where
-    A: ?Sized + Asset<Output = fn(&()) -> O>,
+    A: ?Sized + Asset + for<'a> Types<'a, Output = O>,
 {
     type FixedOutput = O;
 }

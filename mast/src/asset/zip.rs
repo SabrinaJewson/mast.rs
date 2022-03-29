@@ -2,7 +2,7 @@
 //! into a single asset.
 
 use {
-    super::{Asset, Output, Source, SourceWalker},
+    super::{Asset, Output, Source, SourceWalker, Types},
     crate::time::Time,
 };
 
@@ -37,7 +37,7 @@ use {
 /// # impl mast::Time for Time {
 /// #     fn earliest() -> Self { Self }
 /// # }
-/// # fn type_infer<T: Asset<Time = Time, Source = fn(&()) -> ()>>(val: T) -> T { val }
+/// # fn type_infer<T: Asset<Time = Time, Source = ()>>(val: T) -> T { val }
 /// ```
 pub fn zip<T: Zip>(zip: T) -> T::Zip {
     zip.zip()
@@ -68,9 +68,13 @@ impl<A: Asset, const N: usize> Zip for [A; N] {
 #[must_use]
 pub struct Array<A, const N: usize>([A; N]);
 
+impl<'a, A: Asset, const N: usize> Types<'a> for Array<A, N> {
+    type Output = [Output<'a, A>; N];
+    type Source = Source<'a, A>;
+}
+
 impl<A: Asset, const N: usize> Asset for Array<A, N> {
-    type Output = fn(&()) -> [<A::Output as Output<'_>>::Type; N];
-    fn generate(&mut self) -> <Self::Output as Output<'_>>::Type {
+    fn generate(&mut self) -> Output<'_, Self> {
         array_each_mut(&mut self.0).map(A::generate)
     }
 
@@ -83,31 +87,39 @@ impl<A: Asset, const N: usize> Asset for Array<A, N> {
             .unwrap_or_else(Time::earliest)
     }
 
-    type Source = A::Source;
-    fn sources(&mut self, walker: SourceWalker<'_, Self>) {
+    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
         for asset in &mut self.0 {
-            asset.sources(walker);
+            asset.sources(walker)?;
         }
+        Ok(())
     }
 }
 
 macro_rules! impl_for_tuples {
-    (@$_:ident) => {};
-    (@$first:ident $($rest:ident)*) => {
-        impl_for_tuples!($($rest)*);
-    };
-    ($($ident:ident)*) => {
+    ($($ident:ident)*) => { impl_for_tuples!(($($ident)*) ($($ident)*)); };
+    (($_:ident) ($__:ident)) => {};
+    (($($ident:ident)*) ($first:ident $($rest:ident)*)) => {
         #[allow(non_snake_case)]
         const _: () = {
             #[derive(Debug, Clone, Copy)]
             pub struct Tuple<$($ident,)*>($($ident,)*);
-            impl<T, S, $($ident: Asset<Time = T, Source = S>,)*> Asset for Tuple<$($ident,)*>
+
+            impl<'a, S, $($ident,)*> Types<'a> for Tuple<$($ident,)*>
+            where
+                $($ident: Types<'a, Source = S>,)*
+            {
+                type Output = ($(Output<'a, $ident>,)*);
+                type Source = S;
+            }
+
+            impl<T, $($ident,)*> Asset for Tuple<$($ident,)*>
             where
                 T: Time,
-                S: for<'a> Source<'a>,
+                $($rest: for<'a> Types<'a, Source = Source<'a, $first>>,)*
+                Self: for<'a> Types<'a, Output = ($(Output<'a, $ident>,)*), Source = Source<'a, $first>>,
+                $($ident: Asset<Time = T>,)*
             {
-                type Output = fn(&()) -> ($(<$ident::Output as Output<'_>>::Type,)*);
-                fn generate(&mut self) -> <Self::Output as Output<'_>>::Type {
+                fn generate(&mut self) -> Output<'_, Self> {
                     let Self($($ident,)*) = self;
                     ($($ident.generate(),)*)
                 }
@@ -120,17 +132,16 @@ macro_rules! impl_for_tuples {
                     latest
                 }
 
-                type Source = S;
-                fn sources(&mut self, walker: SourceWalker<'_, Self>) {
+                fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
                     let Self($($ident,)*) = self;
-                    $($ident.sources(walker);)*
+                    $($ident.sources(walker)?;)*
+                    Ok(())
                 }
             }
 
-            impl<T, S, $($ident: Asset<Time = T, Source = S>,)*> Zip for ($($ident,)*)
+            impl<$($ident,)*> Zip for ($($ident,)*)
             where
-                T: Time,
-                S: for<'a> Source<'a>,
+                Tuple<$($ident,)*>: Asset,
             {
                 type Zip = Tuple<$($ident,)*>;
                 fn zip(self) -> Self::Zip {
@@ -139,7 +150,7 @@ macro_rules! impl_for_tuples {
                 }
             }
         };
-        impl_for_tuples!(@$($ident)*);
+        impl_for_tuples!(($($rest)*) ($($rest)*));
     };
 }
 impl_for_tuples!(A B C D E F G H I J K L);

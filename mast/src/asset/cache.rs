@@ -1,4 +1,4 @@
-use super::{Asset, FixedOutput, Output, SourceWalker};
+use super::{Asset, FixedOutput, Output, Source, SourceWalker, Types};
 
 /// An asset whose output value is cached, created by [`Asset::cache`].
 #[derive(Debug, Clone, Copy)]
@@ -17,9 +17,13 @@ impl<A: FixedOutput> Cache<A> {
     }
 }
 
+impl<'a, A: FixedOutput> Types<'a> for Cache<A> {
+    type Output = &'a mut A::FixedOutput;
+    type Source = Source<'a, A>;
+}
+
 impl<A: FixedOutput> Asset for Cache<A> {
-    type Output = fn(&()) -> &mut A::FixedOutput;
-    fn generate(&mut self) -> <Self::Output as Output<'_>>::Type {
+    fn generate(&mut self) -> Output<'_, Self> {
         let inner_modified = self.asset.last_modified();
         if self
             .cached
@@ -36,8 +40,7 @@ impl<A: FixedOutput> Asset for Cache<A> {
         self.asset.last_modified()
     }
 
-    type Source = A::Source;
-    fn sources(&mut self, walker: SourceWalker<'_, Self>) {
-        self.asset.sources(walker);
+    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+        self.asset.sources(walker)
     }
 }

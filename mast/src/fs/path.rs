@@ -21,9 +21,13 @@ pub struct Path<P> {
     path: P,
 }
 
+impl<'a, P: AsRef<StdPath>> asset::Types<'a> for Path<P> {
+    type Output = &'a StdPath;
+    type Source = &'a StdPath;
+}
+
 impl<P: AsRef<StdPath>> Asset for Path<P> {
-    type Output = fn(&()) -> &StdPath;
-    fn generate(&mut self) -> <Self::Output as asset::Output<'_>>::Type {
+    fn generate(&mut self) -> asset::Output<'_, Self> {
         self.path.as_ref()
     }
 
@@ -35,8 +39,7 @@ impl<P: AsRef<StdPath>> Asset for Path<P> {
             .unwrap_or_else(SystemTime::earliest)
     }
 
-    type Source = fn(&()) -> &StdPath;
-    fn sources(&mut self, walker: asset::SourceWalker<'_, Self>) {
-        walker.visit(self.path.as_ref());
+    fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+        walker(self.path.as_ref())
     }
 }

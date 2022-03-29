@@ -1,8 +1,6 @@
 use {
-    crate::{
-        asset::{self, Asset},
-        time::{self, Time},
-    },
+    super::{Asset, SourceWalker, Types},
+    crate::time::{self, Time},
     ::core::marker::PhantomData,
 };
 
@@ -54,8 +52,12 @@ impl<V, T, S> Immutable<V, T, S> {
     }
 }
 
-impl<V, T: Time, S: for<'a> asset::Source<'a>> Asset for Immutable<V, T, S> {
-    type Output = fn(&()) -> &mut V;
+impl<'a, V, T: Time, S> Types<'a> for Immutable<V, T, S> {
+    type Output = &'a mut V;
+    type Source = S;
+}
+
+impl<V, T: Time, S> Asset for Immutable<V, T, S> {
     fn generate(&mut self) -> &mut V {
         &mut self.value
     }
@@ -65,6 +67,7 @@ impl<V, T: Time, S: for<'a> asset::Source<'a>> Asset for Immutable<V, T, S> {
         self.created.clone()
     }
 
-    type Source = S;
-    fn sources(&mut self, _walker: asset::SourceWalker<'_, Self>) {}
+    fn sources<W: SourceWalker<Self>>(&mut self, _: &mut W) -> Result<(), W::Error> {
+        Ok(())
+    }
 }
