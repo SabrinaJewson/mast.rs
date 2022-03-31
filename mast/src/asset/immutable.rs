@@ -63,7 +63,7 @@ impl<V, T: Time, S> Asset for Immutable<V, T, S> {
     }
 
     type Time = T;
-    fn last_modified(&mut self) -> Self::Time {
+    fn modified(&mut self) -> Self::Time {
         self.created.clone()
     }
 

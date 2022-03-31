@@ -55,10 +55,10 @@ impl<S: Sequence> Asset for ZipAll<S> {
     }
 
     type Time = <S::Asset as Asset>::Time;
-    fn last_modified(&mut self) -> Self::Time {
+    fn modified(&mut self) -> Self::Time {
         self.sequence
             .iter()
-            .map(Asset::last_modified)
+            .map(Asset::modified)
             .max()
             .unwrap_or_else(Time::earliest)
     }

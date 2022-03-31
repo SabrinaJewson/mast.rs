@@ -50,7 +50,7 @@ impl<V, T: Time, S> Asset for Constant<V, T, S> {
     }
 
     type Time = T;
-    fn last_modified(&mut self) -> Self::Time {
+    fn modified(&mut self) -> Self::Time {
         T::earliest()
     }
 

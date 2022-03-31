@@ -24,7 +24,7 @@ impl<'a, A: FixedOutput> Types<'a> for Cache<A> {
 
 impl<A: FixedOutput> Asset for Cache<A> {
     fn generate(&mut self) -> Output<'_, Self> {
-        let inner_modified = self.asset.last_modified();
+        let inner_modified = self.asset.modified();
         if self
             .cached
             .as_ref()
@@ -36,8 +36,8 @@ impl<A: FixedOutput> Asset for Cache<A> {
     }
 
     type Time = A::Time;
-    fn last_modified(&mut self) -> Self::Time {
-        self.asset.last_modified()
+    fn modified(&mut self) -> Self::Time {
+        self.asset.modified()
     }
 
     fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {

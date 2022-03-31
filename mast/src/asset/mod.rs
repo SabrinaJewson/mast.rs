@@ -72,7 +72,7 @@ pub trait Asset: for<'a> Types<'a> {
     /// the time at which [`Asset::generate`] started returning the value it does.
     ///
     /// This can be used to avoid calling `generate` again, since that may be expensive.
-    fn last_modified(&mut self) -> Self::Time;
+    fn modified(&mut self) -> Self::Time;
 
     /// Walk over each of the [source](Types::Source)s of the asset.
     ///
@@ -250,8 +250,8 @@ macro_rules! impl_for_refs {
             }
 
             type Time = A::Time;
-            fn last_modified(&mut self) -> Self::Time {
-                (**self).last_modified()
+            fn modified(&mut self) -> Self::Time {
+                (**self).modified()
             }
 
             fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {

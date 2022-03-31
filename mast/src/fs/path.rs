@@ -32,7 +32,7 @@ impl<P: AsRef<StdPath>> Asset for Path<P> {
     }
 
     type Time = SystemTime;
-    fn last_modified(&mut self) -> Self::Time {
+    fn modified(&mut self) -> Self::Time {
         crate::fs::path_modified(self.path.as_ref()).unwrap_or_else(SystemTime::earliest)
     }
 

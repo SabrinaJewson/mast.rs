@@ -37,14 +37,13 @@ where
     P: AsRef<Path>,
 {
     fn generate(&mut self) -> asset::Output<'_, Self> {
-        let output =
-            (self.asset.last_modified() >= self.last_modified()).then(|| self.asset.generate());
+        let output = (self.asset.modified() >= self.modified()).then(|| self.asset.generate());
         (self.path.as_ref(), output)
     }
 
     type Time = SystemTime;
-    fn last_modified(&mut self) -> Self::Time {
-        self.asset.last_modified()
+    fn modified(&mut self) -> Self::Time {
+        self.asset.modified()
     }
 
     fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {

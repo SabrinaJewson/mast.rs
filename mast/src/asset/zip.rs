@@ -79,10 +79,10 @@ impl<A: Asset, const N: usize> Asset for Array<A, N> {
     }
 
     type Time = A::Time;
-    fn last_modified(&mut self) -> Self::Time {
+    fn modified(&mut self) -> Self::Time {
         self.0
             .iter_mut()
-            .map(A::last_modified)
+            .map(A::modified)
             .max()
             .unwrap_or_else(Time::earliest)
     }
@@ -125,10 +125,10 @@ macro_rules! impl_for_tuples {
                 }
 
                 type Time = T;
-                fn last_modified(&mut self) -> Self::Time {
+                fn modified(&mut self) -> Self::Time {
                     let Self($($ident,)*) = self;
                     let mut latest = T::earliest();
-                    $(latest = Ord::max(latest, $ident.last_modified());)*
+                    $(latest = Ord::max(latest, $ident.modified());)*
                     latest
                 }
 

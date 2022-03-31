@@ -32,11 +32,8 @@ where
     }
 
     type Time = A::Time;
-    fn last_modified(&mut self) -> Self::Time {
-        Ord::max(
-            self.asset.last_modified(),
-            self.asset.generate().last_modified(),
-        )
+    fn modified(&mut self) -> Self::Time {
+        Ord::max(self.asset.modified(), self.asset.generate().modified())
     }
 
     fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
