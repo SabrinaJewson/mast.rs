@@ -32,12 +32,7 @@ use {
 ///     });
 /// # type_infer(asset).generate();
 /// #
-/// # #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-/// # struct Time;
-/// # impl mast::Time for Time {
-/// #     fn earliest() -> Self { Self }
-/// # }
-/// # fn type_infer<T: Asset<Time = Time, Source = ()>>(val: T) -> T { val }
+/// # fn type_infer<A: Asset<Time = std::time::SystemTime, Source = ()>>(a: A) -> A { a }
 /// ```
 pub fn zip<T: Zip>(zip: T) -> T::Zip {
     zip.zip()

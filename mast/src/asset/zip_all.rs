@@ -25,13 +25,7 @@ use {
 ///         }
 ///     });
 /// # type_infer(asset).generate();
-/// #
-/// # #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-/// # struct Time;
-/// # impl mast::Time for Time {
-/// #     fn earliest() -> Self { Self }
-/// # }
-/// # fn type_infer<T: Asset<Time = Time, Source = fn(&()) -> ()>>(val: T) -> T { val }
+/// # fn type_infer<T: Asset<Time = std::time::SystemTime, Source = ()>>(v: T) -> T { v }
 /// ```
 pub fn zip_all<S: Sequence>(sequence: S) -> ZipAll<S> {
     ZipAll { sequence }

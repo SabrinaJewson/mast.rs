@@ -103,13 +103,8 @@ pub trait Asset: for<'a> Types<'a> {
     ///
     /// let asset = asset::constant(5)
     ///     .map(|val: &mut u32| -> &mut u32 { val });
-    /// # #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    /// # struct Time;
-    /// # impl mast::Time for Time {
-    /// #     fn earliest() -> Self { Self }
-    /// # }
-    /// # fn type_infer(_: impl Asset<Time = Time, Source = fn(&()) -> ()>) {}
-    /// # type_infer(asset);
+    /// # type_infer(asset).generate();
+    /// # fn type_infer<A: Asset<Time = std::time::SystemTime, Source = ()>>(a: A) -> A { a }
     /// ```
     ///
     /// To resolve this,
@@ -122,13 +117,8 @@ pub trait Asset: for<'a> Types<'a> {
     ///
     /// let asset = asset::constant(5)
     ///     .map(funnel(|val| val));
-    /// # #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    /// # struct Time;
-    /// # impl mast::Time for Time {
-    /// #     fn earliest() -> Self { Self }
-    /// # }
-    /// # fn type_infer(_: impl Asset<Time = Time, Source = fn(&()) -> ()>) {}
-    /// # type_infer(asset);
+    /// # type_infer(asset).generate();
+    /// # fn type_infer<A: Asset<Time = std::time::SystemTime, Source = ()>>(a: A) -> A { a }
     /// ```
     ///
     /// This will force `rustc` to make type inference on your closure work differently,
