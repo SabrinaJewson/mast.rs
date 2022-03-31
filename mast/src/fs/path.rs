@@ -3,7 +3,7 @@ use {
         asset::{self, Asset},
         time::Time,
     },
-    ::std::{fs, path::Path as StdPath, time::SystemTime},
+    ::std::{path::Path as StdPath, time::SystemTime},
 };
 
 /// Create an asset that sources from a path on the filesystem.
@@ -33,10 +33,7 @@ impl<P: AsRef<StdPath>> Asset for Path<P> {
 
     type Time = SystemTime;
     fn last_modified(&mut self) -> Self::Time {
-        fs::symlink_metadata(self.path.as_ref())
-            .and_then(|meta| meta.modified())
-            .ok()
-            .unwrap_or_else(SystemTime::earliest)
+        crate::fs::path_modified(self.path.as_ref()).unwrap_or_else(SystemTime::earliest)
     }
 
     fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {

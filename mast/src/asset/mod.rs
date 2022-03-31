@@ -176,7 +176,7 @@ pub trait Asset: for<'a> Types<'a> {
         Flatten::new(self)
     }
 
-    /// Cache the result of this asset based on its modification time.
+    /// Cache the result of this asset in memory based on its modification time.
     ///
     /// With this combinator,
     /// the inner asset won't be regenerated
@@ -188,6 +188,20 @@ pub trait Asset: for<'a> Types<'a> {
         Self: Sized + FixedOutput,
     {
         Cache::new(self)
+    }
+
+    /// Apply this on an asset that writes its result to a path on the filesystem
+    /// to avoid regenerating the asset if the output path is newer than the asset's value.
+    ///
+    /// No sanity or stability guarantees are provided if you override this function.
+    #[cfg(feature = "fs")]
+    #[cfg_attr(doc_nightly, doc(cfg(feature = "fs")))]
+    fn fs_cached<P>(self, path: P) -> crate::fs::Cached<Self, P>
+    where
+        Self: Sized + Asset<Time = std::time::SystemTime>,
+        P: AsRef<std::path::Path>,
+    {
+        crate::fs::Cached::new(self, path)
     }
 }
 

@@ -23,9 +23,8 @@ pub trait Now: Time {
 #[cfg(feature = "fs")]
 static EXE_MODIFIED: Lazy<SystemTime> = Lazy::new(|| {
     std::env::current_exe()
-        .and_then(std::fs::symlink_metadata)
-        .and_then(|meta| meta.modified())
         .ok()
+        .and_then(crate::fs::path_modified)
         .unwrap_or_else(SystemTime::now)
 });
 
