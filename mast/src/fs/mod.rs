@@ -9,6 +9,9 @@ pub use path::{path, Path};
 mod cached;
 pub use cached::Cached;
 
+pub mod bytes;
+pub use bytes::{bytes, Bytes};
+
 pub mod text;
 pub use text::{text, Text};
 
