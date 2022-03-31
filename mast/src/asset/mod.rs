@@ -60,8 +60,14 @@ mod bounds {
 #[must_use]
 pub trait Asset: for<'a> Types<'a> {
     /// Generate the asset's value.
-    ///
     /// This may perform computationally expensive work.
+    ///
+    /// The value returned by this function should generally be immutable,
+    /// since all mutation should happen between calls to `generate` instead.
+    /// If this function returns a unique reference,
+    /// it is probably only for buffer reuse reasons
+    /// and it should be safe to read and write to the value however you like
+    /// without worrying about it affecting the next call to `generate` in any way.
     fn generate(&mut self) -> Output<'_, Self>;
 
     /// The type this asset uses to keep track of time.

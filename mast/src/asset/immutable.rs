@@ -1,5 +1,5 @@
 use {
-    super::{Asset, SourceWalker, Types},
+    super::{Asset, Output, SourceWalker, Types},
     crate::time::{self, Time},
     ::core::marker::PhantomData,
 };
@@ -12,9 +12,6 @@ use {
 /// (like `let` in Rust).
 /// If you know the value at compile time,
 /// use [`constant`] instead.
-///
-/// This asset outputs an `&mut V` for flexibility reasons,
-/// but you should not be mutating its value.
 ///
 /// [`constant`]: super::constant()
 #[derive(Debug, Clone, Copy)]
@@ -53,13 +50,13 @@ impl<V, T, S> Immutable<V, T, S> {
 }
 
 impl<'a, V, T: Time, S> Types<'a> for Immutable<V, T, S> {
-    type Output = &'a mut V;
+    type Output = &'a V;
     type Source = S;
 }
 
 impl<V, T: Time, S> Asset for Immutable<V, T, S> {
-    fn generate(&mut self) -> &mut V {
-        &mut self.value
+    fn generate(&mut self) -> Output<'_, Self> {
+        self.value()
     }
 
     type Time = T;
