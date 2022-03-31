@@ -6,15 +6,22 @@ use {
     ::std::{path::Path as StdPath, time::SystemTime},
 };
 
-/// Create an asset that sources from a path on the filesystem.
+/// Create a no-op asset that sources its modification time from a path on the filesystem.
 ///
-/// This type outputs a shared reference to the `Path` given into it,
+/// This is useful as a base asset
+/// to all other higher-level assets that deal with file sources
+/// (like [`text`](mod@super::text)).
+/// Without it,
+/// Mast will not be able to correctly track the modification time of the resultant assets
+/// which can lead to redundant or skipped rebuilds.
+///
+/// The returned asset outputs a shared reference to the [`Path`](StdPath) given into it,
 /// because it might be useful for users.
 pub fn path<P: AsRef<StdPath>>(path: P) -> Path<P> {
     Path { path }
 }
 
-/// No-op asset that sources from a path on the filesystem.
+/// A no-op asset that sources its modification time from a path on the filesystem.
 #[derive(Debug, Clone, Copy)]
 #[must_use]
 pub struct Path<P> {
