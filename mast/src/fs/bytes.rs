@@ -21,10 +21,12 @@ use {
 /// followed by [`::std::fs::read`],
 /// but is more efficient, convenient and provides better error messages.
 ///
-/// The returned asset outputs an `(&`[`Path`]`, `[`Result`]`<&mut Vec<u8>>)` tuple, giving
+/// The returned asset outputs an `(&`[`Path`]`, `[`Result<'_>`]`)` tuple, giving
 /// the path of the read file
 /// and an exclusive reference to a buffer containing the contents of it
 /// respectively.
+///
+/// [`Result<'_>`]: Result
 pub fn bytes<P: AsRef<Path>>(path: P) -> Bytes<P> {
     Bytes {
         inner: super::path(path),
@@ -41,7 +43,7 @@ pub struct Bytes<P> {
 }
 
 impl<'a, P: AsRef<Path>> asset::Types<'a> for Bytes<P> {
-    type Output = (&'a Path, Result<&'a mut Vec<u8>>);
+    type Output = (&'a Path, Result<'a>);
     type Source = &'a Path;
 }
 
@@ -74,8 +76,8 @@ impl<P: AsRef<Path>> Asset for Bytes<P> {
     }
 }
 
-/// Type alias for [`::core::result::Result`]`<T, `[`Error`]`>`.
-pub type Result<T> = core::result::Result<T, Error>;
+/// Type alias for [`::core::result::Result`]`<&mut Vec<u8>, `[`Error`]`>`.
+pub type Result<'a> = core::result::Result<&'a mut Vec<u8>, Error>;
 
 /// An error that occurred reading a file as bytes.
 #[derive(Debug)]

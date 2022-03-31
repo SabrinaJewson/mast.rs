@@ -20,10 +20,12 @@ use {
 /// followed by [`::std::fs::read_to_string`],
 /// but is more efficient, convenient and provides better error messages.
 ///
-/// The returned asset outputs an `(&`[`Path`]`, `[`Result`]`<&mut `[`String`]`>)` tuple, giving
+/// The returned asset outputs an `(&`[`Path`]`, `[`Result<'_>`]`)` tuple, giving
 /// the path of the read file
 /// and an exclusive reference to a buffer containing the contents of it
 /// respectively.
+///
+/// [`Result<'_>`]: Result
 pub fn text<P: AsRef<Path>>(path: P) -> Text<P> {
     Text {
         inner: super::path(path),
@@ -40,7 +42,7 @@ pub struct Text<P> {
 }
 
 impl<'a, P: AsRef<Path>> asset::Types<'a> for Text<P> {
-    type Output = (&'a Path, Result<&'a mut String>);
+    type Output = (&'a Path, Result<'a>);
     type Source = &'a Path;
 }
 
@@ -73,8 +75,8 @@ impl<P: AsRef<Path>> Asset for Text<P> {
     }
 }
 
-/// Type alias for [`::core::result::Result`]`<T, `[`Error`]`>`.
-pub type Result<T> = core::result::Result<T, Error>;
+/// Type alias for [`::core::result::Result`]`<&mut String, `[`Error`]`>`.
+pub type Result<'a> = core::result::Result<&'a mut String, Error>;
 
 /// An error that occurred reading a text file.
 #[derive(Debug)]
