@@ -15,6 +15,9 @@ pub use bytes::{bytes, Bytes};
 pub mod text;
 pub use text::{text, Text};
 
+pub mod dir;
+pub use dir::{dir, Dir};
+
 /// Utility function to obtain the "last modified" date of a path on the filesystem.
 ///
 /// This intentionally returns an `Option` instead of a `Result`
