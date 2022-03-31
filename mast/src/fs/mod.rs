@@ -9,6 +9,9 @@ pub use path::{path, Path};
 mod cached;
 pub use cached::Cached;
 
+pub mod text;
+pub use text::{text, Text};
+
 /// Utility function to obtain the "last modified" date of a path on the filesystem.
 ///
 /// This intentionally returns an `Option` instead of a `Result`
