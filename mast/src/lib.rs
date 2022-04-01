@@ -12,6 +12,9 @@
 )]
 #![allow(clippy::items_after_statements)]
 #![cfg_attr(doc_nightly, feature(doc_cfg))]
+// Required for `macro-vis`
+#![allow(uncommon_codepoints)]
+#![cfg_attr(doc_nightly, feature(decl_macro, rustc_attrs))]
 #![no_std]
 
 #[cfg(feature = "alloc")]

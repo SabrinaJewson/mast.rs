@@ -10,6 +10,7 @@ keywords = ["build system", "task runner", "make", "gulp"]
 categories = ["caching", "filesystem"]
 
 [dependencies]
+macro-vis = "0.1.1"
 once_cell = { version = "1.10.0", optional = true }
 
 [features]

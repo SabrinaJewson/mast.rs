@@ -1,6 +1,6 @@
 //! The [`Asset`] trait, defining a mutable resource with a known modification time.
 
-use crate::time::Time;
+use {crate::time::Time, ::macro_vis::macro_vis};
 
 mod constant;
 pub use constant::{constant, Constant};
@@ -57,6 +57,10 @@ mod bounds {
 }
 
 /// A mutable resource with a known modification time.
+///
+/// All the methods in here take `&mut self`;
+/// if you don't require that,
+/// make sure to implement the less restrictive [`Shared`] as well.
 #[must_use]
 pub trait Asset: for<'a> Types<'a> {
     /// Generate the asset's value.
@@ -108,7 +112,7 @@ pub trait Asset: for<'a> Types<'a> {
     /// use ::mast::asset::{self, Asset};
     ///
     /// let asset = asset::constant(5)
-    ///     .map(|val: &mut u32| -> &mut u32 { val });
+    ///     .map(|val: &u32| -> &u32 { val });
     /// # type_infer(asset).generate();
     /// # fn type_infer<A: Asset<Time = std::time::SystemTime, Source = ()>>(a: A) -> A { a }
     /// ```
@@ -119,7 +123,7 @@ pub trait Asset: for<'a> Types<'a> {
     /// ```
     /// use ::mast::asset::{self, Asset};
     ///
-    /// fn funnel<F: FnMut(&mut u32) -> &mut u32>(f: F) -> F { f }
+    /// fn funnel<F: FnMut(&u32) -> &u32>(f: F) -> F { f }
     ///
     /// let asset = asset::constant(5)
     ///     .map(funnel(|val| val));
@@ -235,12 +239,12 @@ where
 
 macro_rules! impl_for_refs {
     ($($ty:ty),*) => { $(
-        impl<'a, A: Asset + ?Sized> Types<'a> for $ty {
+        impl<'a, A: ?Sized + Asset> Types<'a> for $ty {
             type Output = Output<'a, A>;
             type Source = Source<'a, A>;
         }
 
-        impl<A: Asset + ?Sized> Asset for $ty {
+        impl<A: ?Sized + Asset> Asset for $ty {
             fn generate(&mut self) -> Output<'_, Self> {
                 (**self).generate()
             }
@@ -254,12 +258,130 @@ macro_rules! impl_for_refs {
                 (**self).sources(walker)
             }
         }
+
+        impl<A: ?Sized + Shared> Shared for $ty {
+            fn ref_generate(&self) -> Output<'_, Self> {
+                (**self).ref_generate()
+            }
+
+            fn ref_modified(&self) -> Self::Time {
+                (**self).ref_modified()
+            }
+
+            fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+                (**self).ref_sources(walker)
+            }
+        }
     )* };
 }
 
 impl_for_refs!(&mut A);
 #[cfg(feature = "alloc")]
 impl_for_refs!(alloc::boxed::Box<A>);
+
+/// An [`Asset`] that doesn't require unique references.
+///
+/// Ideally,
+/// we would provide a blanket implementation of `Asset` for all types implementing this trait.
+/// But that unfortunately interacts badly with generics and coherence,
+/// so you'll often have to implement the two traits separately.
+/// Most of the code duplication can be avoided however with the [`forward_to_shared!`] macro.
+#[must_use]
+pub trait Shared: Asset {
+    /// Like [`Asset::generate`], but takes a shared reference to `self` instead.
+    fn ref_generate(&self) -> Output<'_, Self>;
+
+    /// Like [`Asset::modified`], but takes a shared reference to `self` instead.
+    fn ref_modified(&self) -> Self::Time;
+
+    /// Like [`Asset::sources`], but takes a shared reference to `self` instead.
+    #[allow(clippy::missing_errors_doc)] // Already documented at `Asset::sources`
+    fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error>;
+}
+
+/// Implement the methods of [`Asset`]
+/// by forwarding to an existing implementation of [`Shared`].
+///
+/// You can invoke this in an `impl Asset` block
+/// to have `generate`, `modified` and `sources`
+/// implemented for you automatically.
+/// Note that it doesn't define a `Time` associated type,
+/// so you'll have to do that yourself.
+///
+/// # Examples
+///
+/// ```
+/// use ::mast::{asset::{self, Asset}, Time as _};
+///
+/// struct MyAsset;
+///
+/// impl<'a> asset::Types<'a> for MyAsset {
+///     type Output = ();
+///     type Source = &'a str;
+/// }
+///
+/// impl Asset for MyAsset {
+///     type Time = std::time::SystemTime;
+///     asset::forward_to_shared!();
+/// }
+///
+/// impl asset::Shared for MyAsset {
+///     fn ref_generate(&self) -> asset::Output<'_, Self> {
+///         ()
+///     }
+///     fn ref_modified(&self) -> Self::Time {
+///         std::time::SystemTime::earliest()
+///     }
+///     fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+///         walker("my asset")
+///     }
+/// }
+/// ```
+#[macro_vis(pub)]
+macro_rules! forward_to_shared {
+    () => {
+        fn generate(&mut self) -> $crate::asset::Output<'_, Self> {
+            <Self as $crate::asset::Shared>::ref_generate(self)
+        }
+        fn modified(&mut self) -> <Self as $crate::Asset>::Time {
+            <Self as $crate::asset::Shared>::ref_modified(self)
+        }
+        fn sources<W: $crate::asset::SourceWalker<Self>>(
+            &mut self,
+            walker: &mut W,
+        ) -> $crate::asset::__private::Result<(), <W as $crate::asset::SourceWalker<Self>>::Error> {
+            <Self as $crate::asset::Shared>::ref_sources::<W>(self, walker)
+        }
+    };
+}
+
+// Not public API.
+#[doc(hidden)]
+pub mod __private {
+    pub use Result;
+}
+
+impl<'a, 'b, A: ?Sized + Shared> Types<'a> for &'b A {
+    type Output = Output<'b, A>;
+    type Source = Source<'a, A>;
+}
+
+impl<A: ?Sized + Shared> Asset for &A {
+    type Time = A::Time;
+    forward_to_shared!();
+}
+
+impl<A: ?Sized + Shared> Shared for &A {
+    fn ref_generate(&self) -> Output<'_, Self> {
+        (**self).ref_generate()
+    }
+    fn ref_modified(&self) -> Self::Time {
+        (**self).ref_modified()
+    }
+    fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+        (**self).ref_sources(walker)
+    }
+}
 
 /// An asset whose `Output` does not depend on the lifetime of the asset passed to [`generate`].
 ///

@@ -20,7 +20,7 @@ use {
 ///
 /// let asset = asset::zip_all(vec![asset::constant(0), asset::constant(1)])
 ///     .map(|iter: asset::zip_all::Outputs<core::slice::IterMut<'_, _>>| {
-///         for (i, item @ &mut u32) in iter.enumerate() {
+///         for (i, item @ &u32) in iter.enumerate() {
 ///             assert_eq!(*item, i);
 ///         }
 ///     });

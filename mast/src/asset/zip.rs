@@ -18,7 +18,7 @@ use {
 ///
 /// // Zip an array
 /// let asset = asset::zip([asset::constant(1), asset::constant(2)])
-///     .map(|[a, b]: [&mut u32; 2]| {
+///     .map(|[a, b]: [&u32; 2]| {
 ///         assert_eq!(*a, 1);
 ///         assert_eq!(*b, 2);
 ///     });
@@ -26,7 +26,7 @@ use {
 ///
 /// // Zip a tuple
 /// let asset = asset::zip((asset::constant(1), asset::constant("foo")))
-///     .map(|(a, b): (&mut u32, &mut &'static str)| {
+///     .map(|(a, b): (&u32, &&'static str)| {
 ///         assert_eq!(*a, 1);
 ///         assert_eq!(*b, "foo");
 ///     });
