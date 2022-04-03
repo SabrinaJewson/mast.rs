@@ -32,3 +32,10 @@ pub use asset::Asset;
 
 #[cfg(feature = "fs")]
 pub mod fs;
+
+mod bounds {
+    pub trait Sealed: Sized {}
+    #[allow(missing_debug_implementations)]
+    pub struct Bounds<T>(T);
+    impl<T> Sealed for Bounds<T> {}
+}

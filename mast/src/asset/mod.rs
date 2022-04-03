@@ -1,9 +1,12 @@
 //! The [`Asset`] trait, defining a mutable resource with a known modification time.
 
-use {crate::time::Time, ::macro_vis::macro_vis};
+use {
+    crate::{bounds, time::Time},
+    ::macro_vis::macro_vis,
+};
 
 mod once;
-pub use once::{Once, TakeRef};
+pub use once::{Once, TakeRef, TakeRefs};
 
 mod constant;
 pub use constant::{constant, Constant};
@@ -31,6 +34,10 @@ pub mod zip_all;
 #[doc(no_inline)]
 pub use zip_all::zip_all;
 
+pub mod sequence;
+#[doc(no_inline)]
+pub use sequence::Sequence;
+
 /// Helper to get the output type of an [`Asset`] for a specific lifetime.
 pub type Output<'a, A> = <A as Types<'a>>::Output;
 
@@ -50,13 +57,6 @@ pub trait Types<'a, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'a Self>> {
     /// An asset that sources from the filesystem
     /// will probably use a `&Path` here.
     type Source;
-}
-
-mod bounds {
-    pub trait Sealed: Sized {}
-    #[allow(missing_debug_implementations)]
-    pub struct Bounds<T>(T);
-    impl<T> Sealed for Bounds<T> {}
 }
 
 /// A mutable resource with a known modification time.

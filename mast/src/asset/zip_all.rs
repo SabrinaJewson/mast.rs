@@ -1,10 +1,11 @@
 //! Utilties for combining dynamic-length homogenous collections of assets
 //! into a single asset.
-// Clippy is often not able to see that <Self::Iter as SequenceIter<'_>>::Type will be an iterator.
-#![allow(clippy::iter_not_returning_iterator)]
 
 use {
-    super::{Asset, Output, SourceWalker, Types},
+    super::{
+        sequence::{self, Sequence},
+        Asset, Once, Output, SourceWalker, TakeRefs, Types,
+    },
     crate::time::Time,
     ::core::iter::FusedIterator,
 };
@@ -16,10 +17,10 @@ use {
 /// # Examples
 ///
 /// ```
-/// use ::mast::asset::{self, Asset};
+/// use ::{core::slice, mast::asset::{self, Asset}};
 ///
 /// let asset = asset::zip_all(vec![asset::constant(0), asset::constant(1)])
-///     .map(|iter: asset::zip_all::Outputs<core::slice::IterMut<'_, _>>| {
+///     .map(|iter: asset::zip_all::RefOutputs<slice::IterMut<'_, _>>| {
 ///         for (i, item @ &u32) in iter.enumerate() {
 ///             assert_eq!(*item, i);
 ///         }
@@ -39,8 +40,8 @@ pub struct ZipAll<S> {
 }
 
 impl<'a, S: Sequence> Types<'a> for ZipAll<S> {
-    type Output = Outputs<<S::Iter as SequenceIter<'a>>::Type>;
-    type Source = <S::Asset as Types<'a>>::Source;
+    type Output = Outputs<<S as sequence::Lifetime1<'a>>::Iter>;
+    type Source = <S as sequence::Lifetime2<'a>>::Source;
 }
 
 impl<S: Sequence> Asset for ZipAll<S> {
@@ -48,107 +49,20 @@ impl<S: Sequence> Asset for ZipAll<S> {
         Outputs(self.sequence.iter())
     }
 
-    type Time = <S::Asset as Asset>::Time;
+    type Time = S::Time;
     fn modified(&mut self) -> Self::Time {
         self.sequence
             .iter()
-            .map(Asset::modified)
+            .map(|asset| asset.into_inner().modified())
             .max()
             .unwrap_or_else(Time::earliest)
     }
 
     fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
         for asset in self.sequence.iter() {
-            asset.sources(walker)?;
+            asset.into_inner().sources(walker)?;
         }
         Ok(())
-    }
-}
-
-/// A homogenous sequence of items for use with [`zip_all`].
-pub trait Sequence {
-    /// The type of each asset in the sequence.
-    type Asset: ?Sized + Asset;
-
-    /// A pseudo-GAT representing an iterator over the sequence.
-    type Iter: for<'a> SequenceIter<'a, Item = &'a mut Self::Asset>;
-
-    /// Iterate over the assets in the sequence.
-    fn iter(&mut self) -> <Self::Iter as SequenceIter<'_>>::Type;
-}
-
-/// The type constructor of a sequence's [iterator](Sequence::Iter),
-/// represented as a function pointer of the form `fn(&()) -> I`
-/// where `I` is the actual iterator type.
-pub trait SequenceIter<'a>: sequence_iter::Sealed<'a> {
-    /// The type of each asset in the collection.
-    type Item: Asset;
-
-    /// The iterator type that iterates over the collection.
-    type Type: Iterator<Item = Self::Item>;
-}
-
-impl<'a, F: FnOnce(&'a ()) -> O, O> SequenceIter<'a> for F
-where
-    O: Iterator,
-    O::Item: Asset,
-{
-    type Item = O::Item;
-    type Type = O;
-}
-
-mod sequence_iter {
-    use super::super::Asset;
-
-    pub trait Sealed<'a> {}
-    impl<'a, F: FnOnce(&'a ()) -> O, O> Sealed<'a> for F
-    where
-        O: Iterator,
-        O::Item: Asset,
-    {
-    }
-}
-
-impl<S: ?Sized + Sequence> Sequence for &mut S {
-    type Asset = S::Asset;
-    type Iter = S::Iter;
-    fn iter(&mut self) -> <Self::Iter as SequenceIter<'_>>::Type {
-        (**self).iter()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<S: ?Sized + Sequence> Sequence for alloc::boxed::Box<S> {
-    type Asset = S::Asset;
-    type Iter = S::Iter;
-    fn iter(&mut self) -> <Self::Iter as SequenceIter<'_>>::Type {
-        (**self).iter()
-    }
-}
-
-impl<A: Asset> Sequence for [A] {
-    type Asset = A;
-    type Iter = fn(&()) -> core::slice::IterMut<'_, A>;
-    fn iter(&mut self) -> <Self::Iter as SequenceIter<'_>>::Type {
-        self.iter_mut()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<A: Asset> Sequence for alloc::vec::Vec<A> {
-    type Asset = A;
-    type Iter = fn(&()) -> core::slice::IterMut<'_, A>;
-    fn iter(&mut self) -> <Self::Iter as SequenceIter<'_>>::Type {
-        self.iter_mut()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl<A: Asset> Sequence for alloc::collections::VecDeque<A> {
-    type Asset = A;
-    type Iter = fn(&()) -> alloc::collections::vec_deque::IterMut<'_, A>;
-    fn iter(&mut self) -> <Self::Iter as SequenceIter<'_>>::Type {
-        self.iter_mut()
     }
 }
 
@@ -158,44 +72,56 @@ impl<A: Asset> Sequence for alloc::collections::VecDeque<A> {
 #[must_use]
 pub struct Outputs<I>(I);
 
-impl<'a, I, A> Iterator for Outputs<I>
+impl<I> Iterator for Outputs<I>
 where
-    I: Iterator<Item = &'a mut A>,
-    A: 'a + ?Sized + Asset,
+    I: Iterator,
+    I::Item: Once,
 {
-    type Item = Output<'a, A>;
+    type Item = <I::Item as Once>::OutputOnce;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(Asset::generate)
+        self.0.next().map(Once::generate_once)
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
-}
-
-impl<'a, I, A> DoubleEndedIterator for Outputs<I>
-where
-    I: DoubleEndedIterator<Item = &'a mut A>,
-    A: 'a + ?Sized + Asset,
-{
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.0.next_back().map(Asset::generate)
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth(n).map(Once::generate_once)
     }
 }
 
-impl<'a, I, A> ExactSizeIterator for Outputs<I>
+impl<I> DoubleEndedIterator for Outputs<I>
 where
-    I: ExactSizeIterator<Item = &'a mut A>,
-    A: 'a + ?Sized + Asset,
+    I: DoubleEndedIterator,
+    I::Item: Once,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back().map(Once::generate_once)
+    }
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth_back(n).map(Once::generate_once)
+    }
+}
+
+impl<I> ExactSizeIterator for Outputs<I>
+where
+    I: ExactSizeIterator,
+    I::Item: Once,
 {
     fn len(&self) -> usize {
         self.0.len()
     }
 }
 
-impl<'a, I, A> FusedIterator for Outputs<I>
+impl<I> FusedIterator for Outputs<I>
 where
-    I: FusedIterator<Item = &'a mut A>,
-    A: 'a + ?Sized + Asset,
+    I: FusedIterator,
+    I::Item: Once,
 {
 }
+
+/// Type alias for [`Outputs`]`<`[`TakeRefs`]`<I>>`.
+///
+/// This is a common output type
+/// when dealing with zipped owned sequences of assets.
+pub type RefOutputs<I> = Outputs<TakeRefs<I>>;

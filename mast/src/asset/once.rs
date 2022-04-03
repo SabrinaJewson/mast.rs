@@ -1,4 +1,7 @@
-use super::{Asset, FixedOutput, Output};
+use {
+    super::{Asset, FixedOutput, Output},
+    ::core::iter::FusedIterator,
+};
 
 /// An asset that can be generated once.
 ///
@@ -59,4 +62,76 @@ impl<'a, A: ?Sized + Asset> Once for TakeRef<'a, A> {
     fn generate_once(self) -> Self::OutputOnce {
         self.inner.generate()
     }
+}
+
+/// An iterator that maps `&mut A`s to [`TakeRef<'_, A>`](TakeRef)s.
+#[derive(Debug, Clone)]
+#[must_use]
+pub struct TakeRefs<I>(I);
+
+impl<I> TakeRefs<I> {
+    /// Map an iterator's contents with [`Asset::take_ref`].
+    pub fn new(inner: I) -> Self {
+        Self(inner)
+    }
+}
+
+impl<'a, I, A> Iterator for TakeRefs<I>
+where
+    I: Iterator<Item = &'a mut A>,
+    A: 'a + ?Sized + Asset,
+{
+    type Item = TakeRef<'a, A>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(Asset::take_ref)
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth(n).map(Asset::take_ref)
+    }
+    fn fold<B, F>(self, init: B, mut f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        self.0.fold(init, |acc, x| f(acc, x.take_ref()))
+    }
+}
+
+impl<'a, I, A> DoubleEndedIterator for TakeRefs<I>
+where
+    I: DoubleEndedIterator<Item = &'a mut A>,
+    A: 'a + ?Sized + Asset,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back().map(Asset::take_ref)
+    }
+    fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+        self.0.nth_back(n).map(Asset::take_ref)
+    }
+    fn rfold<B, F>(self, init: B, mut f: F) -> B
+    where
+        F: FnMut(B, Self::Item) -> B,
+    {
+        self.0.rfold(init, |acc, x| f(acc, x.take_ref()))
+    }
+}
+
+impl<'a, I, A> ExactSizeIterator for TakeRefs<I>
+where
+    I: ExactSizeIterator<Item = &'a mut A>,
+    A: 'a + ?Sized + Asset,
+{
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl<'a, I, A> FusedIterator for TakeRefs<I>
+where
+    I: FusedIterator<Item = &'a mut A>,
+    A: 'a + ?Sized + Asset,
+{
 }
