@@ -2,8 +2,9 @@
 //! into a single asset.
 
 use {
-    super::{Asset, Output, Source, SourceWalker, Types},
+    super::{Asset, Output, Shared, Source, SourceWalker, Types},
     crate::time::Time,
+    ::core::mem::MaybeUninit,
 };
 
 /// Combine a set of several assets into a single one
@@ -90,6 +91,27 @@ impl<A: Asset, const N: usize> Asset for Array<A, N> {
     }
 }
 
+impl<A: Shared, const N: usize> Shared for Array<A, N> {
+    fn ref_generate(&self) -> Output<'_, Self> {
+        array_each_ref(&self.0).map(A::ref_generate)
+    }
+
+    fn ref_modified(&self) -> Self::Time {
+        self.0
+            .iter()
+            .map(A::ref_modified)
+            .max()
+            .unwrap_or_else(Time::earliest)
+    }
+
+    fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+        for asset in &self.0 {
+            asset.ref_sources(walker)?;
+        }
+        Ok(())
+    }
+}
+
 macro_rules! impl_for_tuples {
     ($($ident:ident)*) => { impl_for_tuples!(($($ident)*) ($($ident)*)); };
     (($_:ident) ($__:ident)) => {};
@@ -122,14 +144,36 @@ macro_rules! impl_for_tuples {
                 type Time = T;
                 fn modified(&mut self) -> Self::Time {
                     let Self($($ident,)*) = self;
-                    let mut latest = T::earliest();
-                    $(latest = Ord::max(latest, $ident.modified());)*
-                    latest
+                    T::earliest()$(.max($ident.modified()))*
                 }
 
                 fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
                     let Self($($ident,)*) = self;
                     $($ident.sources(walker)?;)*
+                    Ok(())
+                }
+            }
+
+            impl<T, $($ident,)*> Shared for Tuple<$($ident,)*>
+            where
+                T: Time,
+                $($rest: for<'a> Types<'a, Source = Source<'a, $first>>,)*
+                Self: for<'a> Types<'a, Output = ($(Output<'a, $ident>,)*), Source = Source<'a, $first>>,
+                $($ident: Shared<Time = T>,)*
+            {
+                fn ref_generate(&self) -> Output<'_, Self> {
+                    let Self($($ident,)*) = self;
+                    ($($ident.ref_generate(),)*)
+                }
+
+                fn ref_modified(&self) -> Self::Time {
+                    let Self($($ident,)*) = self;
+                    T::earliest()$(.max($ident.ref_modified()))*
+                }
+
+                fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+                    let Self($($ident,)*) = self;
+                    $($ident.ref_sources(walker)?;)*
                     Ok(())
                 }
             }
@@ -150,14 +194,25 @@ macro_rules! impl_for_tuples {
 }
 impl_for_tuples!(A B C D E F G H I J K L);
 
-fn array_each_mut<T, const N: usize>(values: &mut [T; N]) -> [&mut T; N] {
-    use ::core::mem::MaybeUninit;
+struct GivesUninit<T>(T);
+impl<T> GivesUninit<T> {
+    const UNINIT: MaybeUninit<T> = MaybeUninit::uninit();
+}
 
-    struct Helper<T>(T);
-    impl<T> Helper<T> {
-        const UNINIT: MaybeUninit<T> = MaybeUninit::uninit();
+fn array_each_ref<T, const N: usize>(values: &[T; N]) -> [&T; N] {
+    let mut array = [<GivesUninit<&T>>::UNINIT; N];
+    for (i, reference) in values.iter().enumerate() {
+        array[i] = MaybeUninit::new(reference);
     }
-    let mut array = [<Helper<&mut T>>::UNINIT; N];
+    // SAFETY:
+    // - These two types have the same layout
+    // - MaybeUninit on the original array guarantees we won't double-drop
+    // - We have just fully initialized the array
+    unsafe { core::mem::transmute_copy::<[MaybeUninit<&T>; N], [&T; N]>(&array) }
+}
+
+fn array_each_mut<T, const N: usize>(values: &mut [T; N]) -> [&mut T; N] {
+    let mut array = [<GivesUninit<&mut T>>::UNINIT; N];
     for (i, reference) in values.iter_mut().enumerate() {
         array[i] = MaybeUninit::new(reference);
     }
@@ -169,8 +224,14 @@ fn array_each_mut<T, const N: usize>(values: &mut [T; N]) -> [&mut T; N] {
 }
 
 #[test]
-fn array_each_mut_works() {
+fn array_each_works() {
     let mut array = [1, 2, 3];
+
+    let references = array_each_ref(&array);
+    assert_eq!(*references[0], 1);
+    assert_eq!(*references[1], 2);
+    assert_eq!(*references[2], 3);
+
     let references = array_each_mut(&mut array);
     assert_eq!(*references[0], 1);
     assert_eq!(*references[1], 2);

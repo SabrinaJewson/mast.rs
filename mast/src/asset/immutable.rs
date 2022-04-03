@@ -1,5 +1,5 @@
 use {
-    super::{Asset, Output, SourceWalker, Types},
+    super::{forward_to_shared, Asset, Output, Shared, SourceWalker, Types},
     crate::time::{self, Time},
     ::core::marker::PhantomData,
 };
@@ -55,16 +55,20 @@ impl<'a, V, T: Time, S> Types<'a> for Immutable<V, T, S> {
 }
 
 impl<V, T: Time, S> Asset for Immutable<V, T, S> {
-    fn generate(&mut self) -> Output<'_, Self> {
+    type Time = T;
+    forward_to_shared!();
+}
+
+impl<V, T: Time, S> Shared for Immutable<V, T, S> {
+    fn ref_generate(&self) -> Output<'_, Self> {
         self.value()
     }
 
-    type Time = T;
-    fn modified(&mut self) -> Self::Time {
+    fn ref_modified(&self) -> Self::Time {
         self.created.clone()
     }
 
-    fn sources<W: SourceWalker<Self>>(&mut self, _: &mut W) -> Result<(), W::Error> {
+    fn ref_sources<W: SourceWalker<Self>>(&self, _: &mut W) -> Result<(), W::Error> {
         Ok(())
     }
 }

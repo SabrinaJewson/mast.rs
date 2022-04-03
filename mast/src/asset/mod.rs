@@ -2,6 +2,9 @@
 
 use {crate::time::Time, ::macro_vis::macro_vis};
 
+mod once;
+pub use once::{Once, TakeRef};
+
 mod constant;
 pub use constant::{constant, Constant};
 
@@ -142,7 +145,7 @@ pub trait Asset: for<'a> Types<'a> {
     fn map<F>(self, mapper: F) -> Map<Self, F>
     where
         Self: Sized,
-        F: for<'a> map::Mapper<'a, Self>,
+        F: for<'a> map::MapperMut<'a, Self>,
     {
         Map::new(self, mapper)
     }
@@ -157,7 +160,7 @@ pub trait Asset: for<'a> Types<'a> {
     fn map_source<F>(self, mapper: F) -> MapSource<Self, F>
     where
         Self: Sized,
-        F: for<'a> map_source::SourceMapper<'a, Self>,
+        F: for<'a> map_source::SourceMapperMut<'a, Self>,
     {
         MapSource::new(self, mapper)
     }
@@ -171,7 +174,9 @@ pub trait Asset: for<'a> Types<'a> {
     fn flatten(self) -> Flatten<Self>
     where
         Self: Sized,
-        for<'a> Output<'a, Self>: Asset + FixedOutput<Time = Self::Time>,
+        for<'a> Output<'a, Self>: Asset + Once,
+        for<'a, 'c> <Output<'a, Self> as Once>::Inner:
+            Asset<Time = Self::Time> + Types<'c, Source = Source<'c, Self>>,
     {
         Flatten::new(self)
     }
@@ -202,6 +207,13 @@ pub trait Asset: for<'a> Types<'a> {
         P: AsRef<std::path::Path>,
     {
         crate::fs::Cached::new(self, path)
+    }
+
+    /// Take a unique reference to this asset and implement [`Once`] for it.
+    ///
+    /// No sanity or stability guarantees are provided if you override this function.
+    fn take_ref(&mut self) -> TakeRef<'_, Self> {
+        TakeRef::new(self)
     }
 }
 
