@@ -22,7 +22,7 @@ impl<A, P> Cached<A, P> {
     }
 }
 
-impl<'a, A, P> asset::Types<'a> for Cached<A, P>
+impl<'a, A, P> asset::Lifetime<'a> for Cached<A, P>
 where
     A: Asset<Time = SystemTime>,
     P: AsRef<Path>,

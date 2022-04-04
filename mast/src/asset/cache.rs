@@ -17,7 +17,7 @@ impl<A: asset::FixedOutput> Cache<A> {
     }
 }
 
-impl<'a, A: asset::FixedOutput> asset::Types<'a> for Cache<A> {
+impl<'a, A: asset::FixedOutput> asset::Lifetime<'a> for Cache<A> {
     type Output = &'a mut A::FixedOutput;
     type Source = asset::Source<'a, A>;
 }

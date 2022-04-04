@@ -66,7 +66,7 @@ impl<A: Asset, const N: usize> Zip for [A; N] {
 #[must_use]
 pub struct Array<A, const N: usize>([A; N]);
 
-impl<'a, A: Asset, const N: usize> asset::Types<'a> for Array<A, N> {
+impl<'a, A: Asset, const N: usize> asset::Lifetime<'a> for Array<A, N> {
     type Output = [asset::Output<'a, A>; N];
     type Source = asset::Source<'a, A>;
 }
@@ -123,9 +123,9 @@ macro_rules! impl_for_tuples {
             #[derive(Debug, Clone, Copy)]
             pub struct Tuple<$($ident,)*>($($ident,)*);
 
-            impl<'a, S, $($ident,)*> asset::Types<'a> for Tuple<$($ident,)*>
+            impl<'a, S, $($ident,)*> asset::Lifetime<'a> for Tuple<$($ident,)*>
             where
-                $($ident: asset::Types<'a, Source = S>,)*
+                $($ident: asset::Lifetime<'a, Source = S>,)*
             {
                 type Output = ($(asset::Output<'a, $ident>,)*);
                 type Source = S;
@@ -134,8 +134,8 @@ macro_rules! impl_for_tuples {
             impl<T, $($ident,)*> Asset for Tuple<$($ident,)*>
             where
                 T: Time,
-                $($rest: for<'a> asset::Types<'a, Source = asset::Source<'a, $first>>,)*
-                Self: for<'a> asset::Types<'a,
+                $($rest: for<'a> asset::Lifetime<'a, Source = asset::Source<'a, $first>>,)*
+                Self: for<'a> asset::Lifetime<'a,
                     Output = ($(asset::Output<'a, $ident>,)*),
                     Source = asset::Source<'a, $first>,
                 >,
@@ -162,8 +162,8 @@ macro_rules! impl_for_tuples {
             impl<T, $($ident,)*> asset::Shared for Tuple<$($ident,)*>
             where
                 T: Time,
-                $($rest: for<'a> asset::Types<'a, Source = asset::Source<'a, $first>>,)*
-                Self: for<'a> asset::Types<'a,
+                $($rest: for<'a> asset::Lifetime<'a, Source = asset::Source<'a, $first>>,)*
+                Self: for<'a> asset::Lifetime<'a,
                     Output = ($(asset::Output<'a, $ident>,)*),
                     Source = asset::Source<'a, $first>,
                 >,

@@ -30,7 +30,7 @@ pub trait Base {
 /// are independent of the first lifetime given to the sequence
 /// (the lifetime of the sequence itself).
 pub trait Lifetime2<'b, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'b Self>>: Base {
-    /// The [`Source`](asset::Types::Source) associated type of each asset in the sequence.
+    /// The [`Source`](asset::Lifetime::Source) associated type of each asset in the sequence.
     type Source;
 }
 
@@ -42,7 +42,7 @@ pub trait Lifetime1<'a, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'a Self
 {
     /// The inner asset type of each `Once` in the sequence.
     type Asset: Asset<Time = <Self as Base>::Time>
-        + for<'b> asset::Types<'b, Source = <Self as Lifetime2<'b>>::Source>;
+        + for<'b> asset::Lifetime<'b, Source = <Self as Lifetime2<'b>>::Source>;
 
     /// The type of each item in the sequence.
     type Item: asset::Once<Inner = Self::Asset>;
@@ -89,7 +89,7 @@ macro_rules! impl_for_slicelike {
             type Time = A::Time;
         }
         impl<'b, A: Asset, $($generics)*> Lifetime2<'b> for $($ty)* {
-            type Source = <A as asset::Types<'b>>::Source;
+            type Source = <A as asset::Lifetime<'b>>::Source;
         }
         impl<'a, A: Asset, $($generics)*> Lifetime1<'a> for $($ty)* {
             type Asset = &'a mut A;
@@ -115,7 +115,7 @@ impl<A: Asset> Base for VecDeque<A> {
 }
 #[cfg(feature = "alloc")]
 impl<'b, A: Asset> Lifetime2<'b> for VecDeque<A> {
-    type Source = <A as asset::Types<'b>>::Source;
+    type Source = <A as asset::Lifetime<'b>>::Source;
 }
 #[cfg(feature = "alloc")]
 impl<'a, A: Asset> Lifetime1<'a> for VecDeque<A> {

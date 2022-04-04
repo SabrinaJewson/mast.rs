@@ -28,7 +28,7 @@ pub struct Path<P> {
     path: P,
 }
 
-impl<'a, P: AsRef<StdPath>> asset::Types<'a> for Path<P> {
+impl<'a, P: AsRef<StdPath>> asset::Lifetime<'a> for Path<P> {
     type Output = &'a StdPath;
     type Source = &'a StdPath;
 }

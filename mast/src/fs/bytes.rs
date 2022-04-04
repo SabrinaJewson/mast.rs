@@ -42,7 +42,7 @@ pub struct Bytes<P> {
     buffer: Vec<u8>,
 }
 
-impl<'a, P: AsRef<Path>> asset::Types<'a> for Bytes<P> {
+impl<'a, P: AsRef<Path>> asset::Lifetime<'a> for Bytes<P> {
     type Output = (&'a Path, Result<'a>);
     type Source = &'a Path;
 }

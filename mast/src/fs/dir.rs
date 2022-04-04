@@ -37,7 +37,7 @@ pub struct Dir<P> {
     inner: super::Path<P>,
 }
 
-impl<'a, P: AsRef<Path>> asset::Types<'a> for Dir<P> {
+impl<'a, P: AsRef<Path>> asset::Lifetime<'a> for Dir<P> {
     type Output = Result<'a>;
     type Source = &'a Path;
 }

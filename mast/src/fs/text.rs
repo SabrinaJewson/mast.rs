@@ -41,7 +41,7 @@ pub struct Text<P> {
     buffer: String,
 }
 
-impl<'a, P: AsRef<Path>> asset::Types<'a> for Text<P> {
+impl<'a, P: AsRef<Path>> asset::Lifetime<'a> for Text<P> {
     type Output = (&'a Path, Result<'a>);
     type Source = &'a Path;
 }

@@ -51,7 +51,7 @@ impl<V, T, S> Immutable<V, T, S> {
     }
 }
 
-impl<'a, V, T: Time, S> asset::Types<'a> for Immutable<V, T, S> {
+impl<'a, V, T: Time, S> asset::Lifetime<'a> for Immutable<V, T, S> {
     type Output = &'a V;
     type Source = S;
 }

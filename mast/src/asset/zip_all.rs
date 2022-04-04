@@ -38,7 +38,7 @@ pub struct ZipAll<S> {
     sequence: S,
 }
 
-impl<'a, S: asset::Sequence> asset::Types<'a> for ZipAll<S> {
+impl<'a, S: asset::Sequence> asset::Lifetime<'a> for ZipAll<S> {
     type Output = Outputs<<S as asset::sequence::Lifetime1<'a>>::Iter>;
     type Source = <S as asset::sequence::Lifetime2<'a>>::Source;
 }

@@ -1,6 +1,6 @@
 use crate::asset::{self, Asset};
 
-/// An asset whose [source](asset::Types::Source) is mapped to another type by a closure,
+/// An asset whose [source](asset::Lifetime::Source) is mapped to another type by a closure,
 /// created by [`Asset::map_source`].
 #[derive(Debug, Clone, Copy)]
 pub struct MapSource<A, F> {
@@ -14,7 +14,7 @@ impl<A, F> MapSource<A, F> {
     }
 }
 
-impl<'a, A, F> asset::Types<'a> for MapSource<A, F>
+impl<'a, A, F> asset::Lifetime<'a> for MapSource<A, F>
 where
     A: Asset,
     F: for<'b> SourceMapperMut<'b, A>,

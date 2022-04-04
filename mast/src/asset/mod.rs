@@ -39,16 +39,16 @@ pub mod sequence;
 pub use sequence::Sequence;
 
 /// Helper to get the output type of an [`Asset`] for a specific lifetime.
-pub type Output<'a, A> = <A as Types<'a>>::Output;
+pub type Output<'a, A> = <A as Lifetime<'a>>::Output;
 
 /// Helper to the get the source type of an [`Asset`] for a specific lifetime.
-pub type Source<'a, A> = <A as Types<'a>>::Source;
+pub type Source<'a, A> = <A as Lifetime<'a>>::Source;
 
 /// The set of types associated with an [`Asset`] when a specific lifetime is applied.
 ///
 /// This is used to work around the lack of GATs.
 // ImplicitBounds is cursed magic to get the equivalent of GATs' `where Self: 'a`
-pub trait Types<'a, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'a Self>> {
+pub trait Lifetime<'a, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'a Self>> {
     /// The value the asset gives once it is generated.
     type Output;
 
@@ -65,7 +65,7 @@ pub trait Types<'a, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'a Self>> {
 /// if you don't require that,
 /// make sure to implement the less restrictive [`Shared`] as well.
 #[must_use]
-pub trait Asset: for<'a> Types<'a> {
+pub trait Asset: for<'a> Lifetime<'a> {
     /// Generate the asset's value.
     /// This may perform computationally expensive work.
     ///
@@ -87,7 +87,7 @@ pub trait Asset: for<'a> Types<'a> {
     /// This can be used to avoid calling `generate` again, since that may be expensive.
     fn modified(&mut self) -> Self::Time;
 
-    /// Walk over each of the [source](Types::Source)s of the asset.
+    /// Walk over each of the [source](Lifetime::Source)s of the asset.
     ///
     /// This can be useful
     /// to determine which files to watch when implementing features like a watch mode.
@@ -150,7 +150,7 @@ pub trait Asset: for<'a> Types<'a> {
         Map::new(self, mapper)
     }
 
-    /// Map the [source](Types::Source) type of this asset.
+    /// Map the [source](Lifetime::Source) type of this asset.
     ///
     /// This is useful when combining multiple asset kinds,
     /// each with different source types.
@@ -176,7 +176,7 @@ pub trait Asset: for<'a> Types<'a> {
         Self: Sized,
         for<'a> Output<'a, Self>: Asset + Once,
         for<'a, 'c> <Output<'a, Self> as Once>::Inner:
-            Asset<Time = Self::Time> + Types<'c, Source = Source<'c, Self>>,
+            Asset<Time = Self::Time> + Lifetime<'c, Source = Source<'c, Self>>,
     {
         Flatten::new(self)
     }
@@ -251,7 +251,7 @@ where
 
 macro_rules! impl_for_refs {
     ($($ty:ty),*) => { $(
-        impl<'a, A: ?Sized + Asset> Types<'a> for $ty {
+        impl<'a, A: ?Sized + Asset> Lifetime<'a> for $ty {
             type Output = Output<'a, A>;
             type Source = Source<'a, A>;
         }
@@ -327,7 +327,7 @@ pub trait Shared: Asset {
 ///
 /// struct MyAsset;
 ///
-/// impl<'a> asset::Types<'a> for MyAsset {
+/// impl<'a> asset::Lifetime<'a> for MyAsset {
 ///     type Output = ();
 ///     type Source = &'a str;
 /// }
@@ -373,7 +373,7 @@ pub mod __private {
     pub use Result;
 }
 
-impl<'a, 'b, A: ?Sized + Shared> Types<'a> for &'b A {
+impl<'a, 'b, A: ?Sized + Shared> Lifetime<'a> for &'b A {
     type Output = Output<'b, A>;
     type Source = Source<'a, A>;
 }
@@ -402,14 +402,14 @@ impl<A: ?Sized + Shared> Shared for &A {
 ///
 /// [`generate`]: Asset::generate
 pub trait FixedOutput:
-    Asset + for<'a> Types<'a, Output = <Self as FixedOutput>::FixedOutput>
+    Asset + for<'a> Lifetime<'a, Output = <Self as FixedOutput>::FixedOutput>
 {
     /// The asset's output type, independent of any input lifetimes.
     type FixedOutput;
 }
 impl<A, O> FixedOutput for A
 where
-    A: ?Sized + Asset + for<'a> Types<'a, Output = O>,
+    A: ?Sized + Asset + for<'a> Lifetime<'a, Output = O>,
 {
     type FixedOutput = O;
 }

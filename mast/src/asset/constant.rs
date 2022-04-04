@@ -38,7 +38,7 @@ impl<V, T, S> Constant<V, T, S> {
     }
 }
 
-impl<'a, V, T: Time, S> asset::Types<'a> for Constant<V, T, S> {
+impl<'a, V, T: Time, S> asset::Lifetime<'a> for Constant<V, T, S> {
     type Output = &'a V;
     type Source = S;
 }

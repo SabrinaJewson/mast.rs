@@ -13,12 +13,12 @@ impl<A> Flatten<A> {
     }
 }
 
-impl<'a, A> asset::Types<'a> for Flatten<A>
+impl<'a, A> asset::Lifetime<'a> for Flatten<A>
 where
     A: Asset,
     for<'b> asset::Output<'b, A>: asset::Once,
     for<'b, 'c> <asset::Output<'b, A> as asset::Once>::Inner:
-        Asset<Time = A::Time> + asset::Types<'c, Source = asset::Source<'c, A>>,
+        Asset<Time = A::Time> + asset::Lifetime<'c, Source = asset::Source<'c, A>>,
 {
     type Output = <asset::Output<'a, A> as asset::Once>::OutputOnce;
     type Source = asset::Source<'a, A>;
@@ -29,7 +29,7 @@ where
     A: Asset,
     for<'b> asset::Output<'b, A>: asset::Once,
     for<'b, 'c> <asset::Output<'b, A> as asset::Once>::Inner:
-        Asset<Time = A::Time> + asset::Types<'c, Source = asset::Source<'c, A>>,
+        Asset<Time = A::Time> + asset::Lifetime<'c, Source = asset::Source<'c, A>>,
 {
     fn generate(&mut self) -> asset::Output<'_, Self> {
         self.asset.generate().generate_once()
@@ -55,7 +55,7 @@ where
     A: asset::Shared,
     for<'b> asset::Output<'b, A>: asset::Once,
     for<'b, 'c> <asset::Output<'b, A> as asset::Once>::Inner:
-        Asset<Time = A::Time> + asset::Types<'c, Source = asset::Source<'c, A>>,
+        Asset<Time = A::Time> + asset::Lifetime<'c, Source = asset::Source<'c, A>>,
 {
     fn ref_generate(&self) -> asset::Output<'_, Self> {
         self.asset.ref_generate().generate_once()

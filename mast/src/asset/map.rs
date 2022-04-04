@@ -14,7 +14,7 @@ impl<A, F> Map<A, F> {
     }
 }
 
-impl<'a, A, F> asset::Types<'a> for Map<A, F>
+impl<'a, A, F> asset::Lifetime<'a> for Map<A, F>
 where
     A: Asset,
     F: for<'b> MapperMut<'b, A>,
