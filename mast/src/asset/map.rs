@@ -1,6 +1,6 @@
 use crate::asset::{self, Asset};
 
-/// An asset whose output is mapped to another type by a closure,
+/// An asset whose [output](asset::Lifetime::Output) is mapped to another type by a closure,
 /// created by [`Asset::map`].
 #[derive(Debug, Clone, Copy)]
 pub struct Map<A, F> {

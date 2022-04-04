@@ -46,10 +46,10 @@ pub use sequence::Sequence;
 mod erased;
 pub use erased::{Erased, ErasedExt, ErasedTypes};
 
-/// Helper to get the output type of an [`Asset`] for a specific lifetime.
+/// Helper to get the [output type](Lifetime::Output) of an [`Asset`] for a specific lifetime.
 pub type Output<'a, A> = <A as Lifetime<'a>>::Output;
 
-/// Helper to the get the source type of an [`Asset`] for a specific lifetime.
+/// Helper to get the [source type](Lifetime::Source) of an [`Asset`] for a specific lifetime.
 pub type Source<'a, A> = <A as Lifetime<'a>>::Source;
 
 /// The set of types associated with an [`Asset`] when a specific lifetime is applied.
