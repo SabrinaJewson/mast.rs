@@ -13,6 +13,11 @@ use {
 /// into a single asset
 /// that yields an iterator over the inner assets' values.
 ///
+/// Because assets are required to only have one output type
+/// whether they are shared or not,
+/// [`ZipAll`] itself can never implement [`asset::Shared`].
+/// If you wish to share it use [`shared`] instead.
+///
 /// # Examples
 ///
 /// ```
@@ -50,11 +55,7 @@ impl<S: asset::Sequence> Asset for ZipAll<S> {
 
     type Time = S::Time;
     fn modified(&mut self) -> Self::Time {
-        self.sequence
-            .iter()
-            .map(|asset| asset.into_inner().modified())
-            .max()
-            .unwrap_or_else(Time::earliest)
+        modified(self.sequence.iter())
     }
 
     fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
@@ -65,8 +66,55 @@ impl<S: asset::Sequence> Asset for ZipAll<S> {
     }
 }
 
+/// A variant of [`zip_all`]
+/// that produces an asset that implements [`Shared`].
+pub fn shared<S: asset::sequence::Shared>(sequence: S) -> Shared<S> {
+    Shared { sequence }
+}
+
+/// The asset returned by [`shared`].
+#[derive(Debug, Clone)]
+#[must_use]
+pub struct Shared<S> {
+    sequence: S,
+}
+
+impl<'a, S: asset::sequence::Shared> asset::Lifetime<'a> for Shared<S> {
+    type Output = Outputs<<S as asset::sequence::SharedLifetime1<'a>>::IterShared>;
+    type Source = <S as asset::sequence::Lifetime2<'a>>::Source;
+}
+
+impl<S: asset::sequence::Shared> Asset for Shared<S> {
+    type Time = S::Time;
+
+    asset::forward_to_shared!();
+}
+
+impl<S: asset::sequence::Shared> asset::Shared for Shared<S> {
+    fn generate_shared(&self) -> asset::Output<'_, Self> {
+        Outputs(self.sequence.iter_shared())
+    }
+
+    fn modified_shared(&self) -> Self::Time {
+        modified(self.sequence.iter_shared())
+    }
+
+    fn sources_shared<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+        for asset in self.sequence.iter_shared() {
+            asset.into_inner().sources(walker)?;
+        }
+        Ok(())
+    }
+}
+
+fn modified<A: asset::Once>(iter: impl Iterator<Item = A>) -> <A::Inner as Asset>::Time {
+    iter.map(|asset| asset.into_inner().modified())
+        .max()
+        .unwrap_or_else(Time::earliest)
+}
+
 /// An iterator over the outputs of a zipped asset sequence.
-/// This is the output type of [`ZipAll`].
+/// This is the output type of [`ZipAll`] and [`Shared`].
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct Outputs<I>(I);
