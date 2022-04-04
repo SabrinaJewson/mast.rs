@@ -62,15 +62,15 @@ impl<V, T: Time, S> Asset for Immutable<V, T, S> {
 }
 
 impl<V, T: Time, S> asset::Shared for Immutable<V, T, S> {
-    fn ref_generate(&self) -> asset::Output<'_, Self> {
+    fn generate_shared(&self) -> asset::Output<'_, Self> {
         self.value()
     }
 
-    fn ref_modified(&self) -> Self::Time {
+    fn modified_shared(&self) -> Self::Time {
         self.created.clone()
     }
 
-    fn ref_sources<W: asset::SourceWalker<Self>>(&self, _: &mut W) -> Result<(), W::Error> {
+    fn sources_shared<W: asset::SourceWalker<Self>>(&self, _: &mut W) -> Result<(), W::Error> {
         Ok(())
     }
 }

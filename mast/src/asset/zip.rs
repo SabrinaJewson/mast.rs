@@ -94,21 +94,21 @@ impl<A: Asset, const N: usize> Asset for Array<A, N> {
 }
 
 impl<A: asset::Shared, const N: usize> asset::Shared for Array<A, N> {
-    fn ref_generate(&self) -> asset::Output<'_, Self> {
-        array_each_ref(&self.0).map(A::ref_generate)
+    fn generate_shared(&self) -> asset::Output<'_, Self> {
+        array_each_ref(&self.0).map(A::generate_shared)
     }
 
-    fn ref_modified(&self) -> Self::Time {
+    fn modified_shared(&self) -> Self::Time {
         self.0
             .iter()
-            .map(A::ref_modified)
+            .map(A::modified_shared)
             .max()
             .unwrap_or_else(Time::earliest)
     }
 
-    fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+    fn sources_shared<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
         for asset in &self.0 {
-            asset.ref_sources(walker)?;
+            asset.sources_shared(walker)?;
         }
         Ok(())
     }
@@ -169,19 +169,19 @@ macro_rules! impl_for_tuples {
                 >,
                 $($ident: asset::Shared<Time = T>,)*
             {
-                fn ref_generate(&self) -> asset::Output<'_, Self> {
+                fn generate_shared(&self) -> asset::Output<'_, Self> {
                     let Self($($ident,)*) = self;
-                    ($($ident.ref_generate(),)*)
+                    ($($ident.generate_shared(),)*)
                 }
 
-                fn ref_modified(&self) -> Self::Time {
+                fn modified_shared(&self) -> Self::Time {
                     let Self($($ident,)*) = self;
-                    T::earliest()$(.max($ident.ref_modified()))*
+                    T::earliest()$(.max($ident.modified_shared()))*
                 }
 
-                fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+                fn sources_shared<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
                     let Self($($ident,)*) = self;
-                    $($ident.ref_sources(walker)?;)*
+                    $($ident.sources_shared(walker)?;)*
                     Ok(())
                 }
             }

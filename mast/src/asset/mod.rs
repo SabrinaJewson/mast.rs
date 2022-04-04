@@ -272,16 +272,16 @@ macro_rules! impl_for_refs {
         }
 
         impl<A: ?Sized + Shared> Shared for $ty {
-            fn ref_generate(&self) -> Output<'_, Self> {
-                (**self).ref_generate()
+            fn generate_shared(&self) -> Output<'_, Self> {
+                (**self).generate_shared()
             }
 
-            fn ref_modified(&self) -> Self::Time {
-                (**self).ref_modified()
+            fn modified_shared(&self) -> Self::Time {
+                (**self).modified_shared()
             }
 
-            fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
-                (**self).ref_sources(walker)
+            fn sources_shared<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+                (**self).sources_shared(walker)
             }
         }
     )* };
@@ -301,14 +301,14 @@ impl_for_refs!(alloc::boxed::Box<A>);
 #[must_use]
 pub trait Shared: Asset {
     /// Like [`Asset::generate`], but takes a shared reference to `self` instead.
-    fn ref_generate(&self) -> Output<'_, Self>;
+    fn generate_shared(&self) -> Output<'_, Self>;
 
     /// Like [`Asset::modified`], but takes a shared reference to `self` instead.
-    fn ref_modified(&self) -> Self::Time;
+    fn modified_shared(&self) -> Self::Time;
 
     /// Like [`Asset::sources`], but takes a shared reference to `self` instead.
     #[allow(clippy::missing_errors_doc)] // Already documented at `Asset::sources`
-    fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error>;
+    fn sources_shared<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error>;
 }
 
 /// Implement the methods of [`Asset`]
@@ -338,13 +338,13 @@ pub trait Shared: Asset {
 /// }
 ///
 /// impl asset::Shared for MyAsset {
-///     fn ref_generate(&self) -> asset::Output<'_, Self> {
+///     fn generate_shared(&self) -> asset::Output<'_, Self> {
 ///         ()
 ///     }
-///     fn ref_modified(&self) -> Self::Time {
+///     fn modified_shared(&self) -> Self::Time {
 ///         std::time::SystemTime::earliest()
 ///     }
-///     fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+///     fn sources_shared<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
 ///         walker("my asset")
 ///     }
 /// }
@@ -353,16 +353,16 @@ pub trait Shared: Asset {
 macro_rules! forward_to_shared {
     () => {
         fn generate(&mut self) -> $crate::asset::Output<'_, Self> {
-            <Self as $crate::asset::Shared>::ref_generate(self)
+            <Self as $crate::asset::Shared>::generate_shared(self)
         }
         fn modified(&mut self) -> <Self as $crate::Asset>::Time {
-            <Self as $crate::asset::Shared>::ref_modified(self)
+            <Self as $crate::asset::Shared>::modified_shared(self)
         }
         fn sources<W: $crate::asset::SourceWalker<Self>>(
             &mut self,
             walker: &mut W,
         ) -> $crate::asset::__private::Result<(), <W as $crate::asset::SourceWalker<Self>>::Error> {
-            <Self as $crate::asset::Shared>::ref_sources::<W>(self, walker)
+            <Self as $crate::asset::Shared>::sources_shared::<W>(self, walker)
         }
     };
 }
@@ -384,14 +384,14 @@ impl<A: ?Sized + Shared> Asset for &A {
 }
 
 impl<A: ?Sized + Shared> Shared for &A {
-    fn ref_generate(&self) -> Output<'_, Self> {
-        (**self).ref_generate()
+    fn generate_shared(&self) -> Output<'_, Self> {
+        (**self).generate_shared()
     }
-    fn ref_modified(&self) -> Self::Time {
-        (**self).ref_modified()
+    fn modified_shared(&self) -> Self::Time {
+        (**self).modified_shared()
     }
-    fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
-        (**self).ref_sources(walker)
+    fn sources_shared<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+        (**self).sources_shared(walker)
     }
 }
 

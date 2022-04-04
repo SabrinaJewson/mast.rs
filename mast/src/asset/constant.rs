@@ -50,15 +50,15 @@ impl<V, T: Time, S> Asset for Constant<V, T, S> {
 }
 
 impl<V, T: Time, S> asset::Shared for Constant<V, T, S> {
-    fn ref_generate(&self) -> asset::Output<'_, Self> {
+    fn generate_shared(&self) -> asset::Output<'_, Self> {
         self.value()
     }
 
-    fn ref_modified(&self) -> Self::Time {
+    fn modified_shared(&self) -> Self::Time {
         T::earliest()
     }
 
-    fn ref_sources<W: asset::SourceWalker<Self>>(&self, _: &mut W) -> Result<(), W::Error> {
+    fn sources_shared<W: asset::SourceWalker<Self>>(&self, _: &mut W) -> Result<(), W::Error> {
         Ok(())
     }
 }

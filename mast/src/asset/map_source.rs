@@ -50,17 +50,17 @@ where
     A: asset::Shared,
     F: for<'a> SourceMapperRef<'a, A>,
 {
-    fn ref_generate(&self) -> asset::Output<'_, Self> {
-        self.asset.ref_generate()
+    fn generate_shared(&self) -> asset::Output<'_, Self> {
+        self.asset.generate_shared()
     }
 
-    fn ref_modified(&self) -> Self::Time {
-        self.asset.ref_modified()
+    fn modified_shared(&self) -> Self::Time {
+        self.asset.modified_shared()
     }
 
-    fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+    fn sources_shared<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
         self.asset
-            .ref_sources(&mut asset::funnel_source_walker(|source| {
+            .sources_shared(&mut asset::funnel_source_walker(|source| {
                 walker(self.mapper.call_ref(source))
             }))
     }

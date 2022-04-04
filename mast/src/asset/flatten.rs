@@ -57,20 +57,20 @@ where
     for<'b, 'c> <asset::Output<'b, A> as asset::Once>::Inner:
         Asset<Time = A::Time> + asset::Lifetime<'c, Source = asset::Source<'c, A>>,
 {
-    fn ref_generate(&self) -> asset::Output<'_, Self> {
-        self.asset.ref_generate().generate_once()
+    fn generate_shared(&self) -> asset::Output<'_, Self> {
+        self.asset.generate_shared().generate_once()
     }
 
-    fn ref_modified(&self) -> Self::Time {
+    fn modified_shared(&self) -> Self::Time {
         Ord::max(
-            self.asset.ref_modified(),
-            self.asset.ref_generate().into_inner().modified(),
+            self.asset.modified_shared(),
+            self.asset.generate_shared().into_inner().modified(),
         )
     }
 
-    fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
-        self.asset.ref_sources(walker)?;
-        self.asset.ref_generate().into_inner().sources(walker)?;
+    fn sources_shared<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+        self.asset.sources_shared(walker)?;
+        self.asset.generate_shared().into_inner().sources(walker)?;
         Ok(())
     }
 }
