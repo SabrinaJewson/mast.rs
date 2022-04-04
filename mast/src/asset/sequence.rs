@@ -14,7 +14,7 @@ use {
 /// Base associated types of a sequence,
 /// before any lifetimes have been applied.
 pub trait Base {
-    /// The associated [`Time`](Types::Time) type of every asset in the sequence.
+    /// The associated [`Time`](Asset::Time) type of every asset in the sequence.
     type Time: Time;
 }
 
