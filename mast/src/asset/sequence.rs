@@ -203,20 +203,20 @@ impl<S: ?Sized + Shared> Base for &S {
 impl<'b, S: ?Sized + Shared> Lifetime2<'b> for &S {
     type Source = <S as Lifetime2<'b>>::Source;
 }
-impl<'a, S: ?Sized + Shared> Lifetime1<'a> for &S {
+impl<'a, 's, S: ?Sized + Shared> Lifetime1<'a> for &'s S {
     type Asset = <Self::Item as asset::Once>::Inner;
     type Item = <Self::Iter as Iterator>::Item;
-    type Iter = <S as SharedLifetime1<'a>>::IterShared;
+    type Iter = <S as SharedLifetime1<'s>>::IterShared;
 }
 impl<S: ?Sized + Shared> Sequence for &S {
     fn iter(&mut self) -> <Self as Lifetime1<'_>>::Iter {
         (**self).iter_shared()
     }
 }
-impl<'a, S: ?Sized + Shared> SharedLifetime1<'a> for &S {
+impl<'a, 's, S: ?Sized + Shared> SharedLifetime1<'a> for &'s S {
     type AssetShared = <Self::ItemShared as asset::Once>::Inner;
     type ItemShared = <Self::IterShared as Iterator>::Item;
-    type IterShared = <Self as Lifetime1<'a>>::Iter;
+    type IterShared = <Self as Lifetime1<'s>>::Iter;
 }
 impl<S: ?Sized + Shared> Shared for &S {
     fn iter_shared(&self) -> <Self as SharedLifetime1<'_>>::IterShared {
