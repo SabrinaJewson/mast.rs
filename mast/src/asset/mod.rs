@@ -26,6 +26,9 @@ pub use flatten::Flatten;
 mod cache;
 pub use cache::Cache;
 
+mod share_local;
+pub use share_local::ShareLocal;
+
 pub mod zip;
 #[doc(no_inline)]
 pub use zip::zip;
@@ -214,6 +217,16 @@ pub trait Asset: for<'a> Lifetime<'a> {
     /// No sanity or stability guarantees are provided if you override this function.
     fn take_ref(&mut self) -> TakeRef<'_, Self> {
         TakeRef::new(self)
+    }
+
+    /// Implement [`Shared`] for an asset using single-threaded shared mutability.
+    ///
+    /// No sanity or stability guarantees are provided if you override this function.
+    fn share_local(self) -> ShareLocal<Self>
+    where
+        Self: Sized + FixedOutput,
+    {
+        ShareLocal::new(self)
     }
 }
 
