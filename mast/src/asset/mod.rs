@@ -43,6 +43,9 @@ pub mod sequence;
 #[doc(no_inline)]
 pub use sequence::Sequence;
 
+mod erased;
+pub use erased::{Erased, ErasedExt, ErasedTypes};
+
 /// Helper to get the output type of an [`Asset`] for a specific lifetime.
 pub type Output<'a, A> = <A as Lifetime<'a>>::Output;
 
