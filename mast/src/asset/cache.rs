@@ -18,7 +18,7 @@ impl<A: asset::FixedOutput> Cache<A> {
 }
 
 impl<'a, A: asset::FixedOutput> asset::Lifetime<'a> for Cache<A> {
-    type Output = &'a mut A::FixedOutput;
+    type Output = &'a A::FixedOutput;
     type Source = asset::Source<'a, A>;
 }
 
@@ -32,7 +32,7 @@ impl<A: asset::FixedOutput> Asset for Cache<A> {
         {
             self.cached = Some((inner_modified, self.asset.generate()));
         }
-        &mut self.cached.as_mut().unwrap().1
+        &self.cached.as_ref().unwrap().1
     }
 
     type Time = A::Time;

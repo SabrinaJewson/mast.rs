@@ -19,6 +19,8 @@
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
+#[cfg(feature = "lock_api_04")]
+pub extern crate lock_api_04_crate as lock_api_04;
 #[cfg(feature = "std")]
 extern crate std;
 

@@ -9,17 +9,19 @@ license = "MIT"
 keywords = ["build system", "task runner", "make", "gulp"]
 categories = ["caching", "filesystem"]
 
-[dependencies]
-macro-vis = "0.1.1"
-once_cell = { version = "1.10.0", optional = true }
-
 [features]
 default = []
 
 alloc = []
 std = ["alloc"]
+lock_api_04 = ["lock_api_04_crate"]
 
 fs = ["std", "once_cell"]
+
+[dependencies]
+macro-vis = "0.1.1"
+once_cell = { version = "1.10.0", optional = true }
+lock_api_04_crate = { package = "lock_api", version = "0.4.7", optional = true }
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "doc_nightly"]

@@ -29,6 +29,8 @@ pub use cache::Cache;
 mod share_local;
 pub use share_local::ShareLocal;
 
+pub mod share_mutex;
+
 pub mod zip;
 #[doc(no_inline)]
 pub use zip::zip;
@@ -220,6 +222,9 @@ pub trait Asset: for<'a> Lifetime<'a> {
     }
 
     /// Implement [`Shared`] for an asset using single-threaded shared mutability.
+    ///
+    /// If you want the resulting asset to be `Sync`,
+    /// see the [`share_mutex`] module.
     ///
     /// No sanity or stability guarantees are provided if you override this function.
     fn share_local(self) -> ShareLocal<Self>
