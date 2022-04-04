@@ -249,7 +249,7 @@ where
     walker
 }
 
-macro_rules! impl_for_refs {
+macro_rules! impl_for_unique_refs {
     ($($ty:ty),*) => { $(
         impl<'a, A: ?Sized + Asset> Lifetime<'a> for $ty {
             type Output = Output<'a, A>;
@@ -287,9 +287,9 @@ macro_rules! impl_for_refs {
     )* };
 }
 
-impl_for_refs!(&mut A);
+impl_for_unique_refs!(&mut A);
 #[cfg(feature = "alloc")]
-impl_for_refs!(alloc::boxed::Box<A>);
+impl_for_unique_refs!(alloc::boxed::Box<A>);
 
 /// An [`Asset`] that doesn't require unique references.
 ///
@@ -394,6 +394,40 @@ impl<A: ?Sized + Shared> Shared for &A {
         (**self).sources_shared(walker)
     }
 }
+
+#[cfg(feature = "alloc")]
+macro_rules! impl_for_shared_refs {
+    ($($ty:ty),*) => { $(
+        impl<'a, A: ?Sized + Shared> Lifetime<'a> for $ty {
+            type Output = Output<'a, A>;
+            type Source = Source<'a, A>;
+        }
+
+        impl<A: ?Sized + Shared> Asset for $ty {
+            type Time = A::Time;
+
+            forward_to_shared!();
+        }
+
+        impl<A: ?Sized + Shared> Shared for $ty {
+            fn generate_shared(&self) -> Output<'_, Self> {
+                (**self).generate_shared()
+            }
+            fn modified_shared(&self) -> Self::Time {
+                (**self).modified_shared()
+            }
+            fn sources_shared<W: SourceWalker<Self>>(
+                &self,
+                walker: &mut W,
+            ) -> Result<(), W::Error> {
+                (**self).sources_shared(walker)
+            }
+        }
+    )* };
+}
+
+#[cfg(feature = "alloc")]
+impl_for_shared_refs!(::alloc::rc::Rc<A>, ::alloc::sync::Arc<A>);
 
 /// An asset whose `Output` does not depend on the lifetime of the asset passed to [`generate`].
 ///
