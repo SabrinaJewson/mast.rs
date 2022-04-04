@@ -6,8 +6,11 @@
 #[cfg(feature = "alloc")]
 use ::alloc::collections::vec_deque::{self, VecDeque};
 use {
-    super::{Asset, Once, TakeRef, TakeRefs, Types},
-    crate::{bounds, time::Time},
+    crate::{
+        asset::{self, Asset},
+        bounds,
+        time::Time,
+    },
     ::core::slice,
 };
 
@@ -21,13 +24,13 @@ pub trait Base {
 /// Associated types of a sequence with its second lifetime applied.
 ///
 /// This second lifetime is the lifetime given to the asset in the sequence
-/// if `.into_inner()` is called on the [`Once`].
+/// if `.into_inner()` is called on the [`asset::Once`].
 ///
 /// Note that the types in this trait
 /// are independent of the first lifetime given to the sequence
 /// (the lifetime of the sequence itself).
 pub trait Lifetime2<'b, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'b Self>>: Base {
-    /// The [`Source`](Types::Source) associated type of each asset in the sequence.
+    /// The [`Source`](asset::Types::Source) associated type of each asset in the sequence.
     type Source;
 }
 
@@ -39,10 +42,10 @@ pub trait Lifetime1<'a, ImplicitBounds: bounds::Sealed = bounds::Bounds<&'a Self
 {
     /// The inner asset type of each `Once` in the sequence.
     type Asset: Asset<Time = <Self as Base>::Time>
-        + for<'b> Types<'b, Source = <Self as Lifetime2<'b>>::Source>;
+        + for<'b> asset::Types<'b, Source = <Self as Lifetime2<'b>>::Source>;
 
     /// The type of each item in the sequence.
-    type Item: Once<Inner = Self::Asset>;
+    type Item: asset::Once<Inner = Self::Asset>;
 
     /// An iterator over the items in the sequence.
     type Iter: Iterator<Item = Self::Item>;
@@ -63,7 +66,7 @@ macro_rules! impl_for_mut_ref {
             type Source = <S as Lifetime2<'b>>::Source;
         }
         impl<'a, S: ?Sized + Sequence> Lifetime1<'a> for $($ref)* {
-            type Asset = <Self::Item as Once>::Inner;
+            type Asset = <Self::Item as asset::Once>::Inner;
             type Item = <Self::Iter as Iterator>::Item;
             type Iter = <S as Lifetime1<'a>>::Iter;
         }
@@ -86,16 +89,16 @@ macro_rules! impl_for_slicelike {
             type Time = A::Time;
         }
         impl<'b, A: Asset, $($generics)*> Lifetime2<'b> for $($ty)* {
-            type Source = <A as Types<'b>>::Source;
+            type Source = <A as asset::Types<'b>>::Source;
         }
         impl<'a, A: Asset, $($generics)*> Lifetime1<'a> for $($ty)* {
             type Asset = &'a mut A;
-            type Item = TakeRef<'a, A>;
-            type Iter = TakeRefs<slice::IterMut<'a, A>>;
+            type Item = asset::TakeRef<'a, A>;
+            type Iter = asset::TakeRefs<slice::IterMut<'a, A>>;
         }
         impl<A: Asset, $($generics)*> Sequence for $($ty)* {
             fn iter(&mut self) -> <Self as Lifetime1<'_>>::Iter {
-                TakeRefs::new(self.iter_mut())
+                asset::TakeRefs::new(self.iter_mut())
             }
         }
     };
@@ -112,17 +115,17 @@ impl<A: Asset> Base for VecDeque<A> {
 }
 #[cfg(feature = "alloc")]
 impl<'b, A: Asset> Lifetime2<'b> for VecDeque<A> {
-    type Source = <A as Types<'b>>::Source;
+    type Source = <A as asset::Types<'b>>::Source;
 }
 #[cfg(feature = "alloc")]
 impl<'a, A: Asset> Lifetime1<'a> for VecDeque<A> {
     type Asset = &'a mut A;
-    type Item = TakeRef<'a, A>;
-    type Iter = TakeRefs<vec_deque::IterMut<'a, A>>;
+    type Item = asset::TakeRef<'a, A>;
+    type Iter = asset::TakeRefs<vec_deque::IterMut<'a, A>>;
 }
 #[cfg(feature = "alloc")]
 impl<A: Asset> Sequence for VecDeque<A> {
     fn iter(&mut self) -> <Self as Lifetime1<'_>>::Iter {
-        TakeRefs::new(self.iter_mut())
+        asset::TakeRefs::new(self.iter_mut())
     }
 }

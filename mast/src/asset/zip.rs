@@ -2,8 +2,10 @@
 //! into a single asset.
 
 use {
-    super::{Asset, Output, Shared, Source, SourceWalker, Types},
-    crate::time::Time,
+    crate::{
+        asset::{self, Asset},
+        time::Time,
+    },
     ::core::mem::MaybeUninit,
 };
 
@@ -64,13 +66,13 @@ impl<A: Asset, const N: usize> Zip for [A; N] {
 #[must_use]
 pub struct Array<A, const N: usize>([A; N]);
 
-impl<'a, A: Asset, const N: usize> Types<'a> for Array<A, N> {
-    type Output = [Output<'a, A>; N];
-    type Source = Source<'a, A>;
+impl<'a, A: Asset, const N: usize> asset::Types<'a> for Array<A, N> {
+    type Output = [asset::Output<'a, A>; N];
+    type Source = asset::Source<'a, A>;
 }
 
 impl<A: Asset, const N: usize> Asset for Array<A, N> {
-    fn generate(&mut self) -> Output<'_, Self> {
+    fn generate(&mut self) -> asset::Output<'_, Self> {
         array_each_mut(&mut self.0).map(A::generate)
     }
 
@@ -83,7 +85,7 @@ impl<A: Asset, const N: usize> Asset for Array<A, N> {
             .unwrap_or_else(Time::earliest)
     }
 
-    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+    fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
         for asset in &mut self.0 {
             asset.sources(walker)?;
         }
@@ -91,8 +93,8 @@ impl<A: Asset, const N: usize> Asset for Array<A, N> {
     }
 }
 
-impl<A: Shared, const N: usize> Shared for Array<A, N> {
-    fn ref_generate(&self) -> Output<'_, Self> {
+impl<A: asset::Shared, const N: usize> asset::Shared for Array<A, N> {
+    fn ref_generate(&self) -> asset::Output<'_, Self> {
         array_each_ref(&self.0).map(A::ref_generate)
     }
 
@@ -104,7 +106,7 @@ impl<A: Shared, const N: usize> Shared for Array<A, N> {
             .unwrap_or_else(Time::earliest)
     }
 
-    fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+    fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
         for asset in &self.0 {
             asset.ref_sources(walker)?;
         }
@@ -121,22 +123,25 @@ macro_rules! impl_for_tuples {
             #[derive(Debug, Clone, Copy)]
             pub struct Tuple<$($ident,)*>($($ident,)*);
 
-            impl<'a, S, $($ident,)*> Types<'a> for Tuple<$($ident,)*>
+            impl<'a, S, $($ident,)*> asset::Types<'a> for Tuple<$($ident,)*>
             where
-                $($ident: Types<'a, Source = S>,)*
+                $($ident: asset::Types<'a, Source = S>,)*
             {
-                type Output = ($(Output<'a, $ident>,)*);
+                type Output = ($(asset::Output<'a, $ident>,)*);
                 type Source = S;
             }
 
             impl<T, $($ident,)*> Asset for Tuple<$($ident,)*>
             where
                 T: Time,
-                $($rest: for<'a> Types<'a, Source = Source<'a, $first>>,)*
-                Self: for<'a> Types<'a, Output = ($(Output<'a, $ident>,)*), Source = Source<'a, $first>>,
+                $($rest: for<'a> asset::Types<'a, Source = asset::Source<'a, $first>>,)*
+                Self: for<'a> asset::Types<'a,
+                    Output = ($(asset::Output<'a, $ident>,)*),
+                    Source = asset::Source<'a, $first>,
+                >,
                 $($ident: Asset<Time = T>,)*
             {
-                fn generate(&mut self) -> Output<'_, Self> {
+                fn generate(&mut self) -> asset::Output<'_, Self> {
                     let Self($($ident,)*) = self;
                     ($($ident.generate(),)*)
                 }
@@ -147,21 +152,24 @@ macro_rules! impl_for_tuples {
                     T::earliest()$(.max($ident.modified()))*
                 }
 
-                fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+                fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
                     let Self($($ident,)*) = self;
                     $($ident.sources(walker)?;)*
                     Ok(())
                 }
             }
 
-            impl<T, $($ident,)*> Shared for Tuple<$($ident,)*>
+            impl<T, $($ident,)*> asset::Shared for Tuple<$($ident,)*>
             where
                 T: Time,
-                $($rest: for<'a> Types<'a, Source = Source<'a, $first>>,)*
-                Self: for<'a> Types<'a, Output = ($(Output<'a, $ident>,)*), Source = Source<'a, $first>>,
-                $($ident: Shared<Time = T>,)*
+                $($rest: for<'a> asset::Types<'a, Source = asset::Source<'a, $first>>,)*
+                Self: for<'a> asset::Types<'a,
+                    Output = ($(asset::Output<'a, $ident>,)*),
+                    Source = asset::Source<'a, $first>,
+                >,
+                $($ident: asset::Shared<Time = T>,)*
             {
-                fn ref_generate(&self) -> Output<'_, Self> {
+                fn ref_generate(&self) -> asset::Output<'_, Self> {
                     let Self($($ident,)*) = self;
                     ($($ident.ref_generate(),)*)
                 }
@@ -171,7 +179,7 @@ macro_rules! impl_for_tuples {
                     T::earliest()$(.max($ident.ref_modified()))*
                 }
 
-                fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+                fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
                     let Self($($ident,)*) = self;
                     $($ident.ref_sources(walker)?;)*
                     Ok(())

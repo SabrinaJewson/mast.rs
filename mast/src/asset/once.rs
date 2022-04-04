@@ -1,5 +1,5 @@
 use {
-    super::{Asset, FixedOutput, Output},
+    crate::asset::{self, Asset},
     ::core::iter::FusedIterator,
 };
 
@@ -10,7 +10,7 @@ use {
 /// takes `self` instead of `&mut self`.
 ///
 /// This is implemented for
-/// any type implementing [`FixedOutput`]
+/// any type implementing [`asset::FixedOutput`]
 /// as well as [`TakeRef`].
 #[must_use]
 pub trait Once: Sized {
@@ -27,7 +27,7 @@ pub trait Once: Sized {
     fn generate_once(self) -> Self::OutputOnce;
 }
 
-impl<A: FixedOutput> Once for A {
+impl<A: asset::FixedOutput> Once for A {
     type Inner = Self;
     fn into_inner(self) -> Self::Inner {
         self
@@ -58,7 +58,7 @@ impl<'a, A: ?Sized + Asset> Once for TakeRef<'a, A> {
         self.inner
     }
 
-    type OutputOnce = Output<'a, A>;
+    type OutputOnce = asset::Output<'a, A>;
     fn generate_once(self) -> Self::OutputOnce {
         self.inner.generate()
     }

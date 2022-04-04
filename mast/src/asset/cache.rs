@@ -1,14 +1,14 @@
-use super::{Asset, FixedOutput, Output, Source, SourceWalker, Types};
+use crate::asset::{self, Asset};
 
 /// An asset whose output value is cached, created by [`Asset::cache`].
 #[derive(Debug, Clone, Copy)]
 #[must_use]
-pub struct Cache<A: FixedOutput> {
+pub struct Cache<A: asset::FixedOutput> {
     asset: A,
     cached: Option<(A::Time, A::FixedOutput)>,
 }
 
-impl<A: FixedOutput> Cache<A> {
+impl<A: asset::FixedOutput> Cache<A> {
     pub(crate) fn new(asset: A) -> Self {
         Self {
             asset,
@@ -17,13 +17,13 @@ impl<A: FixedOutput> Cache<A> {
     }
 }
 
-impl<'a, A: FixedOutput> Types<'a> for Cache<A> {
+impl<'a, A: asset::FixedOutput> asset::Types<'a> for Cache<A> {
     type Output = &'a mut A::FixedOutput;
-    type Source = Source<'a, A>;
+    type Source = asset::Source<'a, A>;
 }
 
-impl<A: FixedOutput> Asset for Cache<A> {
-    fn generate(&mut self) -> Output<'_, Self> {
+impl<A: asset::FixedOutput> Asset for Cache<A> {
+    fn generate(&mut self) -> asset::Output<'_, Self> {
         let inner_modified = self.asset.modified();
         if self
             .cached
@@ -40,7 +40,7 @@ impl<A: FixedOutput> Asset for Cache<A> {
         self.asset.modified()
     }
 
-    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+    fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
         self.asset.sources(walker)
     }
 }

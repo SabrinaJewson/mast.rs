@@ -1,4 +1,4 @@
-use super::{Asset, Once, Output, Shared, Source, SourceWalker, Types};
+use crate::asset::{self, Asset, Once as _};
 
 /// An asset that has been flattened, created by [`Asset::flatten`]
 #[derive(Debug, Clone, Copy)]
@@ -13,25 +13,25 @@ impl<A> Flatten<A> {
     }
 }
 
-impl<'a, A> Types<'a> for Flatten<A>
+impl<'a, A> asset::Types<'a> for Flatten<A>
 where
     A: Asset,
-    for<'b> Output<'b, A>: Once,
-    for<'b, 'c> <Output<'b, A> as Once>::Inner:
-        Asset<Time = A::Time> + Types<'c, Source = Source<'c, A>>,
+    for<'b> asset::Output<'b, A>: asset::Once,
+    for<'b, 'c> <asset::Output<'b, A> as asset::Once>::Inner:
+        Asset<Time = A::Time> + asset::Types<'c, Source = asset::Source<'c, A>>,
 {
-    type Output = <Output<'a, A> as Once>::OutputOnce;
-    type Source = Source<'a, A>;
+    type Output = <asset::Output<'a, A> as asset::Once>::OutputOnce;
+    type Source = asset::Source<'a, A>;
 }
 
 impl<A> Asset for Flatten<A>
 where
     A: Asset,
-    for<'b> Output<'b, A>: Once,
-    for<'b, 'c> <Output<'b, A> as Once>::Inner:
-        Asset<Time = A::Time> + Types<'c, Source = Source<'c, A>>,
+    for<'b> asset::Output<'b, A>: asset::Once,
+    for<'b, 'c> <asset::Output<'b, A> as asset::Once>::Inner:
+        Asset<Time = A::Time> + asset::Types<'c, Source = asset::Source<'c, A>>,
 {
-    fn generate(&mut self) -> Output<'_, Self> {
+    fn generate(&mut self) -> asset::Output<'_, Self> {
         self.asset.generate().generate_once()
     }
 
@@ -43,21 +43,21 @@ where
         )
     }
 
-    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+    fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
         self.asset.sources(walker)?;
         self.asset.generate().into_inner().sources(walker)?;
         Ok(())
     }
 }
 
-impl<A> Shared for Flatten<A>
+impl<A> asset::Shared for Flatten<A>
 where
-    A: Shared,
-    for<'b> Output<'b, A>: Once,
-    for<'b, 'c> <Output<'b, A> as Once>::Inner:
-        Asset<Time = A::Time> + Types<'c, Source = Source<'c, A>>,
+    A: asset::Shared,
+    for<'b> asset::Output<'b, A>: asset::Once,
+    for<'b, 'c> <asset::Output<'b, A> as asset::Once>::Inner:
+        Asset<Time = A::Time> + asset::Types<'c, Source = asset::Source<'c, A>>,
 {
-    fn ref_generate(&self) -> Output<'_, Self> {
+    fn ref_generate(&self) -> asset::Output<'_, Self> {
         self.asset.ref_generate().generate_once()
     }
 
@@ -68,7 +68,7 @@ where
         )
     }
 
-    fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+    fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
         self.asset.ref_sources(walker)?;
         self.asset.ref_generate().into_inner().sources(walker)?;
         Ok(())

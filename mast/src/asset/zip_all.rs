@@ -2,11 +2,10 @@
 //! into a single asset.
 
 use {
-    super::{
-        sequence::{self, Sequence},
-        Asset, Once, Output, SourceWalker, TakeRefs, Types,
+    crate::{
+        asset::{self, Asset, Once as _},
+        time::Time,
     },
-    crate::time::Time,
     ::core::iter::FusedIterator,
 };
 
@@ -28,7 +27,7 @@ use {
 /// # type_infer(asset).generate();
 /// # fn type_infer<T: Asset<Time = std::time::SystemTime, Source = ()>>(v: T) -> T { v }
 /// ```
-pub fn zip_all<S: Sequence>(sequence: S) -> ZipAll<S> {
+pub fn zip_all<S: asset::Sequence>(sequence: S) -> ZipAll<S> {
     ZipAll { sequence }
 }
 
@@ -39,13 +38,13 @@ pub struct ZipAll<S> {
     sequence: S,
 }
 
-impl<'a, S: Sequence> Types<'a> for ZipAll<S> {
-    type Output = Outputs<<S as sequence::Lifetime1<'a>>::Iter>;
-    type Source = <S as sequence::Lifetime2<'a>>::Source;
+impl<'a, S: asset::Sequence> asset::Types<'a> for ZipAll<S> {
+    type Output = Outputs<<S as asset::sequence::Lifetime1<'a>>::Iter>;
+    type Source = <S as asset::sequence::Lifetime2<'a>>::Source;
 }
 
-impl<S: Sequence> Asset for ZipAll<S> {
-    fn generate(&mut self) -> Output<'_, Self> {
+impl<S: asset::Sequence> Asset for ZipAll<S> {
+    fn generate(&mut self) -> asset::Output<'_, Self> {
         Outputs(self.sequence.iter())
     }
 
@@ -58,7 +57,7 @@ impl<S: Sequence> Asset for ZipAll<S> {
             .unwrap_or_else(Time::earliest)
     }
 
-    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+    fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
         for asset in self.sequence.iter() {
             asset.into_inner().sources(walker)?;
         }
@@ -75,38 +74,38 @@ pub struct Outputs<I>(I);
 impl<I> Iterator for Outputs<I>
 where
     I: Iterator,
-    I::Item: Once,
+    I::Item: asset::Once,
 {
-    type Item = <I::Item as Once>::OutputOnce;
+    type Item = <I::Item as asset::Once>::OutputOnce;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(Once::generate_once)
+        self.0.next().map(asset::Once::generate_once)
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.0.size_hint()
     }
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        self.0.nth(n).map(Once::generate_once)
+        self.0.nth(n).map(asset::Once::generate_once)
     }
 }
 
 impl<I> DoubleEndedIterator for Outputs<I>
 where
     I: DoubleEndedIterator,
-    I::Item: Once,
+    I::Item: asset::Once,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
-        self.0.next_back().map(Once::generate_once)
+        self.0.next_back().map(asset::Once::generate_once)
     }
     fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
-        self.0.nth_back(n).map(Once::generate_once)
+        self.0.nth_back(n).map(asset::Once::generate_once)
     }
 }
 
 impl<I> ExactSizeIterator for Outputs<I>
 where
     I: ExactSizeIterator,
-    I::Item: Once,
+    I::Item: asset::Once,
 {
     fn len(&self) -> usize {
         self.0.len()
@@ -116,12 +115,12 @@ where
 impl<I> FusedIterator for Outputs<I>
 where
     I: FusedIterator,
-    I::Item: Once,
+    I::Item: asset::Once,
 {
 }
 
-/// Type alias for [`Outputs`]`<`[`TakeRefs`]`<I>>`.
+/// Type alias for [`Outputs`]`<`[`TakeRefs`](asset::TakeRefs)`<I>>`.
 ///
 /// This is a common output type
 /// when dealing with zipped owned sequences of assets.
-pub type RefOutputs<I> = Outputs<TakeRefs<I>>;
+pub type RefOutputs<I> = Outputs<asset::TakeRefs<I>>;

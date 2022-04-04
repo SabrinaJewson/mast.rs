@@ -1,4 +1,4 @@
-use super::{Asset, Output, Shared, Source, SourceWalker, Types};
+use crate::asset::{self, Asset};
 
 /// An asset whose output is mapped to another type by a closure,
 /// created by [`Asset::map`].
@@ -14,13 +14,13 @@ impl<A, F> Map<A, F> {
     }
 }
 
-impl<'a, A, F> Types<'a> for Map<A, F>
+impl<'a, A, F> asset::Types<'a> for Map<A, F>
 where
     A: Asset,
     F: for<'b> MapperMut<'b, A>,
 {
     type Output = <F as MapperMut<'a, A>>::Output;
-    type Source = Source<'a, A>;
+    type Source = asset::Source<'a, A>;
 }
 
 impl<A, F> Asset for Map<A, F>
@@ -28,7 +28,7 @@ where
     A: Asset,
     F: for<'a> MapperMut<'a, A>,
 {
-    fn generate(&mut self) -> Output<'_, Self> {
+    fn generate(&mut self) -> asset::Output<'_, Self> {
         self.mapper.call_mut(self.asset.generate())
     }
 
@@ -37,17 +37,17 @@ where
         self.asset.modified()
     }
 
-    fn sources<W: SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
+    fn sources<W: asset::SourceWalker<Self>>(&mut self, walker: &mut W) -> Result<(), W::Error> {
         self.asset.sources(walker)
     }
 }
 
-impl<A, F> Shared for Map<A, F>
+impl<A, F> asset::Shared for Map<A, F>
 where
-    A: Shared,
+    A: asset::Shared,
     F: for<'a> MapperRef<'a, A>,
 {
-    fn ref_generate(&self) -> Output<'_, Self> {
+    fn ref_generate(&self) -> asset::Output<'_, Self> {
         self.mapper.call_ref(self.asset.ref_generate())
     }
 
@@ -55,21 +55,21 @@ where
         self.asset.ref_modified()
     }
 
-    fn ref_sources<W: SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
+    fn ref_sources<W: asset::SourceWalker<Self>>(&self, walker: &mut W) -> Result<(), W::Error> {
         self.asset.ref_sources(walker)
     }
 }
 
 pub trait MapperMut<'a, A: Asset, ImplicitBounds = &'a A>: Sized {
     type Output;
-    fn call_mut(&mut self, output: Output<'a, A>) -> Self::Output;
+    fn call_mut(&mut self, output: asset::Output<'a, A>) -> Self::Output;
 }
 impl<'a, A: Asset, F, O> MapperMut<'a, A> for F
 where
-    F: FnMut(Output<'a, A>) -> O,
+    F: FnMut(asset::Output<'a, A>) -> O,
 {
     type Output = O;
-    fn call_mut(&mut self, output: Output<'a, A>) -> Self::Output {
+    fn call_mut(&mut self, output: asset::Output<'a, A>) -> Self::Output {
         self(output)
     }
 }
@@ -77,13 +77,13 @@ where
 pub trait MapperRef<'a, A: Asset, ImplicitBounds = &'a A>:
     Sized + MapperMut<'a, A, ImplicitBounds>
 {
-    fn call_ref(&self, output: Output<'a, A>) -> Self::Output;
+    fn call_ref(&self, output: asset::Output<'a, A>) -> Self::Output;
 }
 impl<'a, A: Asset, F, O> MapperRef<'a, A> for F
 where
-    F: Fn(Output<'a, A>) -> O,
+    F: Fn(asset::Output<'a, A>) -> O,
 {
-    fn call_ref(&self, output: Output<'a, A>) -> Self::Output {
+    fn call_ref(&self, output: asset::Output<'a, A>) -> Self::Output {
         self(output)
     }
 }
