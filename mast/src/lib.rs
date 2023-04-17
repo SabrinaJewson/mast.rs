@@ -1,4 +1,8 @@
-//! Mast is a flexible build system configured by Rust code.
+//! Mast is a flexible build and caching system configured by Rust code.
+//!
+//! # Non-features
+//!
+//! - Automatic cleaning
 #![warn(
     noop_method_call,
     trivial_casts,
@@ -10,34 +14,32 @@
     missing_debug_implementations,
     clippy::pedantic
 )]
-#![allow(clippy::items_after_statements)]
-#![cfg_attr(doc_nightly, feature(doc_cfg))]
-// Required for `macro-vis`
-#![allow(uncommon_codepoints)]
-#![cfg_attr(doc_nightly, feature(decl_macro, rustc_attrs))]
 #![no_std]
 
-#[cfg(feature = "alloc")]
-extern crate alloc;
-#[cfg(feature = "lock_api_04")]
-pub extern crate lock_api_04_crate as lock_api_04;
 #[cfg(feature = "std")]
 extern crate std;
 
-pub mod time;
-#[doc(no_inline)]
-pub use time::Time;
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 pub mod asset;
-#[doc(no_inline)]
-pub use asset::Asset;
+pub mod etag;
 
-#[cfg(feature = "fs")]
-pub mod fs;
-
-mod bounds {
-    pub trait Sealed: Sized {}
-    #[allow(missing_debug_implementations)]
-    pub struct Bounds<T>(T);
-    impl<T> Sealed for Bounds<T> {}
+macro_rules! for_tuples {
+    ($macro:ident) => {
+        $macro!(Tuple0:                         );
+        $macro!(Tuple1:             A           );
+        $macro!(Tuple2:            A B          );
+        $macro!(Tuple3:           A B C         );
+        $macro!(Tuple4:          A B C D        );
+        $macro!(Tuple5:         A B C D E       );
+        $macro!(Tuple6:        A B C D E F      );
+        $macro!(Tuple7:       A B C D E F G     );
+        $macro!(Tuple8:      A B C D E F G H    );
+        $macro!(Tuple9:     A B C D E F G H I   );
+        $macro!(Tuple10:   A B C D E F G H I J  );
+        $macro!(Tuple11:  A B C D E F G H I J K );
+        $macro!(Tuple12: A B C D E F G H I J K L);
+    };
 }
+use for_tuples;

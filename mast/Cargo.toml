@@ -2,7 +2,7 @@
 name = "mast"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.59.0"
+rust-version = "1.68.0"
 description = "A flexible build system configured by Rust code"
 repository = "https://github.com/SabrinaJewson/mast.rs"
 license = "MIT"
@@ -14,14 +14,9 @@ default = []
 
 alloc = []
 std = ["alloc"]
-lock_api_04 = ["lock_api_04_crate"]
-
-fs = ["std", "once_cell"]
 
 [dependencies]
-macro-vis = "0.1.1"
-once_cell = { version = "1.10.0", optional = true }
-lock_api_04_crate = { package = "lock_api", version = "0.4.7", optional = true }
+pin-project-lite = "0.2.9"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "doc_nightly"]
