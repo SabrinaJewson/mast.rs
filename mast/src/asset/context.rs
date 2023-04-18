@@ -214,22 +214,22 @@ impl<const N: usize> Inner for [&'_ dyn Value; N] {
 }
 
 macro_rules! impl_for_tuple {
-        ($name:ident: $($t:ident)*) => {
-            #[allow(non_snake_case)]
-            impl<$($t: Value,)*> Inner for ($($t,)*) {
-                fn __with_values_erased<'this>(
-                    &'this self,
-                    Token: Token,
-                    f: &mut dyn FnMut(&[&'this dyn Value]),
-                ) {
-                    let ($($t,)*) = self;
-                    $(let $t: &'this dyn Value = $t;)*
-                    f(&[$($t,)*]);
-                }
+    ($name:ident: $($t:ident)*) => {
+        #[allow(non_snake_case)]
+        impl<$($t: Value,)*> Inner for ($($t,)*) {
+            fn __with_values_erased<'this>(
+                &'this self,
+                Token: Token,
+                f: &mut dyn FnMut(&[&'this dyn Value]),
+            ) {
+                let ($($t,)*) = self;
+                $(let $t: &'this dyn Value = $t;)*
+                f(&[$($t,)*]);
             }
-            impl<$($t: Value,)*> Tuple for ($($t,)*) {}
-        };
-    }
+        }
+        impl<$($t: Value,)*> Tuple for ($($t,)*) {}
+    };
+}
 crate::for_tuples!(impl_for_tuple);
 
 use core::any::type_name;
