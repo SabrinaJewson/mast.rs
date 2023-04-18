@@ -1,3 +1,10 @@
+//! The [`Etag`] trait,
+//! representing a fingerprint of a value.
+
+/// An `Etag` represents a fingerprint of a value,
+/// such that identical etags imply identical full data
+/// (but identical full data does not necessarily imply identical etags).
+///
 /// # Invariants
 ///
 /// Implementations of this trait are assumed to uphold the following invariants:
@@ -13,9 +20,23 @@
 ///         does not necessarily produce the same byte sequence.
 /// - Serialization must produce an architecture-independent format.
 /// - Deserialization must not replace the [`Reader`] with a different one.
+/// - The exact bytes produced by serialization are not considered to be part of the public API,
+///     but it *is* a breaking change if old data that previously successfully deserialized
+///     deserializes to a different thing or fails to deserialize.
+///     It is *not* a breaking change to allow old data that previously failed to deserialize
+///     to successfully deserialize.
 pub trait Etag: 'static + Sized + Debug + Default {
+    /// Serialize the etag into its architecture-independent binary format.
     fn serialize<W: ?Sized + Writer>(&self, writer: &mut W);
+
+    /// An error in [`Self::deserialize`] caused by the input format being invalid.
     type DeserializeError;
+
+    /// Attempt to deserialize this etag from its binary format.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the input format is invalid.
     fn deserialize(reader: &mut Reader<'_>) -> Result<Self, Self::DeserializeError>;
 }
 

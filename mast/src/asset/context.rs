@@ -1,4 +1,6 @@
-//! Easily thread miscellaneous miscellaneous context types to all [`Asset`]s.
+//! The [`Context`] type,
+//! to enable easily threading miscellaneous miscellaneous context types
+//! to all [`Asset`](super::Asset)s.
 
 /// A type used to easily thread miscellaneous context types to all [`Asset`](super::Asset)s.
 #[derive(Clone, Copy)]
