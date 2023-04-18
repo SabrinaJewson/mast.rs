@@ -21,24 +21,155 @@
 /// - Serialization must produce an architecture-independent format.
 /// - Deserialization must not replace the [`Reader`] with a different one.
 /// - The exact bytes produced by serialization are not considered to be part of the public API,
-///     but it *is* a breaking change if old data that previously successfully deserialized
-///     deserializes to a different thing or fails to deserialize.
-///     It is *not* a breaking change to allow old data that previously failed to deserialize
-///     to successfully deserialize.
+///     but it *is* a breaking change if old data previously returned by `serialize`
+///     now deserializes to a different thing or fails to deserialize.
+///     It is *not* a breaking change to allow data that previously failed to deserialize
+///     to successfully deserialize,
+///     or to disallow data that previously successfully deserialized
+///     but could not have been returned from `serialize`.
 pub trait Etag: 'static + Sized + Debug + Default {
     /// Serialize the etag into its architecture-independent binary format.
     fn serialize<W: ?Sized + Writer>(&self, writer: &mut W);
 
-    /// An error in [`Self::deserialize`] caused by the input format being invalid.
-    type DeserializeError;
+    /// Serialize the etag to a `Vec<u8>`.
+    #[cfg(feature = "alloc")]
+    #[cfg_attr(doc_nightly, doc(cfg(feature = "alloc")))]
+    fn to_vec(&self) -> alloc::vec::Vec<u8> {
+        let mut vec = alloc::vec::Vec::new();
+        self.serialize(&mut vec);
+        vec
+    }
 
     /// Attempt to deserialize this etag from its binary format.
     ///
     /// # Errors
     ///
     /// Fails if the input format is invalid.
-    fn deserialize(reader: &mut Reader<'_>) -> Result<Self, Self::DeserializeError>;
+    /// It is not specified how many bytes the `reader` has consumed.
+    fn deserialize(reader: &mut Reader<'_>) -> Result<Self, DeserializeError>;
+
+    /// Attempt to deserialize this etag from bytes.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the input format is invalid,
+    /// or [`Self::deserialize`] does not consume all the bytes.
+    fn from_bytes(bytes: &[u8]) -> Result<Self, FromBytesError> {
+        let mut reader = Reader::new(bytes);
+        let deserialized = Self::deserialize(&mut reader).map_err(FromBytesError::Deserialize)?;
+        let trailing = reader.remaining().len();
+        if let Some(number) = NonZeroU32::new(trailing.try_into().unwrap_or(u32::MAX)) {
+            return Err(FromBytesError::TrailingBytes(TrailingBytes { number }));
+        }
+        Ok(deserialized)
+    }
 }
+
+mod deserialize_error {
+    /// An error in [`Etag::deserialize`](super::Etag::deserialize).
+    ///
+    /// This type is intentionally opaque
+    /// because the binary etag format is not human-writeable,
+    /// and so detailed error messages are unlikely to be helpful.
+    #[derive(Clone)]
+    pub struct DeserializeError {
+        // Use this instead of `non_exhaustive` to disallow construction within this crate.
+        _private: (),
+    }
+
+    impl DeserializeError {
+        /// Construct a nonspecific error.
+        #[must_use]
+        pub const fn nonspecific() -> Self {
+            Self { _private: () }
+        }
+    }
+
+    impl Debug for DeserializeError {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.pad("DeserializeError")
+        }
+    }
+
+    impl Display for DeserializeError {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.write_str("invalid etag")
+        }
+    }
+
+    #[cfg(feature = "std")]
+    #[cfg_attr(doc_nightly, doc(cfg(feature = "std")))]
+    impl std::error::Error for DeserializeError {}
+
+    use core::fmt;
+    use core::fmt::Debug;
+    use core::fmt::Display;
+    use core::fmt::Formatter;
+}
+pub use deserialize_error::DeserializeError;
+
+/// An error in [`Etag::from_bytes`].
+#[derive(Debug, Clone)]
+pub enum FromBytesError {
+    /// An error deserializing the etag.
+    Deserialize(DeserializeError),
+
+    /// The call to [`Etag::deserialize`] didn’t consume all the input.
+    TrailingBytes(TrailingBytes),
+}
+
+impl Display for FromBytesError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str("failed to deserialize etag from bytes")
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg_attr(doc_nightly, doc(cfg(feature = "std")))]
+impl std::error::Error for FromBytesError {
+    fn source(&self) -> Option<&(dyn 'static + std::error::Error)> {
+        match self {
+            Self::Deserialize(e) => Some(e),
+            Self::TrailingBytes(e) => Some(e),
+        }
+    }
+}
+
+/// The call to [`Etag::deserialize`] didn’t consume all the input.
+#[derive(Debug, Clone)]
+pub struct TrailingBytes {
+    number: NonZeroU32,
+}
+
+impl Display for TrailingBytes {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.number.get() {
+            u32::MAX => f.write_str("over 4 billion trailing bytes found in input"),
+            1 => write!(f, "1 trailing byte found in input"),
+            n => write!(f, "{n} trailing bytes found in input"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg_attr(doc_nightly, doc(cfg(feature = "std")))]
+impl std::error::Error for TrailingBytes {}
+
+macro_rules! impl_for_tuple {
+    ($name:ident: $($t:ident)*) => {
+        impl<$($t: Etag,)*> Etag for ($($t,)*) {
+            #[allow(non_snake_case)]
+            fn serialize<W: ?Sized + Writer>(&self, _writer: &mut W) {
+                let ($($t,)*) = self;
+                $($t.serialize(_writer);)*
+            }
+            fn deserialize(_reader: &mut Reader<'_>) -> Result<Self, DeserializeError> {
+                Ok(($($t::deserialize(_reader)?,)*))
+            }
+        }
+    }
+}
+crate::for_tuples!(impl_for_tuple);
 
 /// A sink of bytes to serialize into.
 ///
@@ -144,7 +275,12 @@ impl Writer for alloc::vec::Vec<u8> {
 }
 
 /// A cursor around an in-memory buffer to deserialize from.
-#[derive(Debug, Clone)]
+///
+/// # Errors
+///
+/// Methods on this type that return a [`DeserializeError`]
+/// give the guarantee that failure will *not* advance the `Reader`.
+#[derive(Debug)]
 pub struct Reader<'buf> {
     buf: &'buf [u8],
 }
@@ -169,27 +305,37 @@ impl<'buf> Reader<'buf> {
         self.buf = &self.buf[n..];
     }
 
+    /// Peek from the reader.
+    /// Semantically the same as a clone.
+    #[must_use]
+    pub const fn peek(&self) -> Self {
+        Self::new(self.remaining())
+    }
+
     /// Read a slice of bytes from the reader.
-    pub fn read_bytes(&mut self, n: usize) -> Result<&'buf [u8], UnexpectedEof> {
-        let buf = self.remaining().get(..n).ok_or(UnexpectedEof)?;
+    pub fn read_bytes(&mut self, n: usize) -> Result<&'buf [u8], DeserializeError> {
+        let buf = self
+            .remaining()
+            .get(..n)
+            .ok_or_else(DeserializeError::nonspecific)?;
         self.consume(n);
         Ok(buf)
     }
 
     /// Read an array of bytes from the reader.
-    pub fn read_array<const N: usize>(&mut self) -> Result<[u8; N], UnexpectedEof> {
+    pub fn read_array<const N: usize>(&mut self) -> Result<[u8; N], DeserializeError> {
         let msg = "`read_bytes` should read the correct number of bytes";
         Ok(self.read_bytes(N)?.try_into().expect(msg))
     }
 
     /// Fill the given buffer with bytes from the reader.
-    pub fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), UnexpectedEof> {
+    pub fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), DeserializeError> {
         buf.copy_from_slice(self.read_bytes(buf.len())?);
         Ok(())
     }
 
     /// Read and consume a single byte from the reader.
-    pub fn read_u8(&mut self) -> Result<u8, UnexpectedEof> {
+    pub fn read_u8(&mut self) -> Result<u8, DeserializeError> {
         self.read_array().map(|[byte]| byte)
     }
 
@@ -209,32 +355,18 @@ impl<'buf> Reader<'buf> {
 macro_rules! prim_reader_methods {
     ($($read_type:ident $read_type_var:ident($decode:ident) $type:ident,)*) => { $(
         #[doc = concat!("Read a fixed-width `", stringify!($type), "` in little-endian.")]
-        pub fn $read_type(&mut self) -> Result<$type, UnexpectedEof> {
+        pub fn $read_type(&mut self) -> Result<$type, DeserializeError> {
             self.read_array().map($type::from_le_bytes)
         }
         #[doc = concat!("Read a `", stringify!($type), "` using a variable-width encoding.")]
         ///
         /// See the docs of [`Writer`] for details on how this works.
-        pub fn $read_type_var(&mut self) -> Result<$type, UnexpectedEof> {
+        pub fn $read_type_var(&mut self) -> Result<$type, DeserializeError> {
             varint::$decode(self)
         }
     )* }
 }
 use prim_reader_methods;
-
-/// An unexpected EOF was encountered.
-#[derive(Debug, Clone, Copy)]
-pub struct UnexpectedEof;
-
-impl Display for UnexpectedEof {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str("unexpected EOF")
-    }
-}
-
-#[cfg(feature = "std")]
-#[cfg_attr(doc_nightly, doc(cfg(feature = "std")))]
-impl std::error::Error for UnexpectedEof {}
 
 mod varint {
     pub(crate) fn encode_unsigned<W: ?Sized + Writer, T: Unsigned>(writer: &mut W, value: T) {
@@ -262,12 +394,12 @@ mod varint {
 
     pub(crate) fn decode_unsigned<T: Unsigned>(
         reader: &mut Reader<'_>,
-    ) -> Result<T, UnexpectedEof> {
-        let first_byte = reader.remaining().first().ok_or(UnexpectedEof)?;
+    ) -> Result<T, DeserializeError> {
+        let first_byte = reader.peek().read_u8()?;
         let first_byte_leading = first_byte.leading_zeros() as usize;
         let (leading_zeros, initial) =
             if mem::size_of::<u64>() < mem::size_of::<T>() && first_byte_leading == 8 {
-                let second_byte = reader.remaining().get(1).ok_or(UnexpectedEof)?;
+                let [_, second_byte] = reader.peek().read_array()?;
                 (8 + second_byte.leading_zeros() as usize, 2)
             } else {
                 (first_byte_leading, 1)
@@ -280,15 +412,17 @@ mod varint {
             bytes.as_mut()[first_byte_index + leading_zeros / 8] &=
                 0b0111_1111 >> (leading_zeros % 8);
             T::from_be_bytes(bytes)
-        } else {
+        } else if leading_zeros % 8 == 0 {
             reader.consume(initial);
             reader.read_exact(bytes.as_mut())?;
             T::from_le_bytes(bytes)
+        } else {
+            return Err(DeserializeError::nonspecific());
         };
         Ok(res)
     }
 
-    pub(crate) fn decode_signed<T: Signed>(reader: &mut Reader<'_>) -> Result<T, UnexpectedEof> {
+    pub(crate) fn decode_signed<T: Signed>(reader: &mut Reader<'_>) -> Result<T, DeserializeError> {
         decode_unsigned::<T::Unsigned>(reader).map(zigzag::decode)
     }
 
@@ -307,6 +441,10 @@ mod varint {
             check_unsigned(16_383_u32, &[0b0111_1111, 0b1111_1111]);
             check_unsigned(16_384_u16, &[0b0000_0000, 0b0000_0000, 0b0100_0000]);
             check_unsigned(16_384_u32, &[0b0010_0000, 0b0100_0000, 0b0000_0000]);
+            check_fail::<u16>(&[0b0010_0000, 0b0100_0000, 0b0000_0000]);
+            check_unsigned(2_u32.pow(28), b"\x00\x00\x00\x00\x10");
+            check_unsigned(2_u64.pow(28), b"\x08\x10\x00\x00\x00");
+            check_fail::<u32>(b"\x08\x08\x00\x00\x00");
             check_unsigned(2_u64.pow(56) - 1, b"\x01\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
             check_unsigned(2_u64.pow(56), b"\x00\x00\x00\x00\x00\x00\x00\x00\x01");
             check_unsigned(2_u128.pow(56) - 1, b"\x01\xFF\xFF\xFF\xFF\xFF\xFF\xFF");
@@ -324,6 +462,13 @@ mod varint {
             );
         }
 
+        #[test]
+        fn fail() {
+            check_fail::<u8>(&[]);
+            check_fail::<u128>(&[]);
+            check_fail::<u16>(&[0b0100_0000]);
+        }
+
         #[track_caller]
         fn check_unsigned<T: Unsigned>(value: T, encoded: &[u8]) {
             let mut actual_encoded = Vec::new();
@@ -336,6 +481,13 @@ mod varint {
             assert_eq!(value, actual_value, "decoding is incorrect");
         }
 
+        #[track_caller]
+        fn check_fail<T: Unsigned>(encoded: &[u8]) {
+            let mut reader = Reader::new(encoded);
+            super::decode_unsigned::<T>(&mut reader).unwrap_err();
+            assert_eq!(reader.remaining(), encoded, "reader advanced");
+        }
+
         use super::super::num::Unsigned;
         use super::super::Reader;
         use alloc::vec::Vec;
@@ -344,8 +496,8 @@ mod varint {
     use super::num::Signed;
     use super::num::Unsigned;
     use super::zigzag;
+    use super::DeserializeError;
     use super::Reader;
-    use super::UnexpectedEof;
     use super::Writer;
     use core::mem;
 }
@@ -495,3 +647,4 @@ use core::fmt;
 use core::fmt::Debug;
 use core::fmt::Display;
 use core::fmt::Formatter;
+use core::num::NonZeroU32;
