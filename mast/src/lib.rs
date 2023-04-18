@@ -92,6 +92,25 @@ mod tracked {
                 delta: self.delta,
             }
         }
+        /// Apply a closure to value in the `Tracked<T>`.
+        #[must_use]
+        pub fn map<O, F: FnOnce(T) -> O>(self, f: F) -> Tracked<O> {
+            Tracked {
+                value: f(self.value),
+                delta: self.delta,
+            }
+        }
+        /// Combine two tracked values together.
+        ///
+        /// The [`Delta`]s are combined with [`Delta::or`] —
+        /// the result is considered modified if either the inputs are modified.
+        #[must_use]
+        pub fn zip<U>(self, other: Tracked<U>) -> Tracked<(T, U)> {
+            Tracked {
+                value: (self.value, other.value),
+                delta: self.delta.or(other.delta),
+            }
+        }
     }
 
     use crate::Delta;
