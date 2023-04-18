@@ -16,7 +16,6 @@ alloc = []
 std = ["alloc"]
 
 [dependencies]
-pin-project-lite = "0.2.9"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "doc_nightly"]
