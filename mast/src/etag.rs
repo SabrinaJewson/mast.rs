@@ -65,48 +65,33 @@ pub trait Etag: 'static + Sized + Debug + Default {
     }
 }
 
-mod deserialize_error {
-    /// An error in [`Etag::deserialize`](super::Etag::deserialize).
-    ///
-    /// This type is intentionally opaque
-    /// because the binary etag format is not human-writeable,
-    /// and so detailed error messages are unlikely to be helpful.
-    #[derive(Clone)]
-    pub struct DeserializeError {
-        // Use this instead of `non_exhaustive` to disallow construction within this crate.
-        _private: (),
-    }
-
-    impl DeserializeError {
-        /// Construct a nonspecific error.
-        #[must_use]
-        pub const fn nonspecific() -> Self {
-            Self { _private: () }
-        }
-    }
-
-    impl Debug for DeserializeError {
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            f.pad("DeserializeError")
-        }
-    }
-
-    impl Display for DeserializeError {
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            f.write_str("invalid etag")
-        }
-    }
-
-    #[cfg(feature = "std")]
-    #[cfg_attr(doc_nightly, doc(cfg(feature = "std")))]
-    impl std::error::Error for DeserializeError {}
-
-    use core::fmt;
-    use core::fmt::Debug;
-    use core::fmt::Display;
-    use core::fmt::Formatter;
+/// An error in [`Etag::deserialize`](super::Etag::deserialize).
+///
+/// This type is intentionally opaque
+/// because the binary etag format is not human-writeable,
+/// and so detailed error messages are unlikely to be helpful.
+#[derive(Debug, Clone)]
+pub enum DeserializeError {
+    /// The input data was invalid.
+    /// This includes unexpected EOFs and other invalid data.
+    Invalid,
+    /// The current machine’s word size is too small
+    /// (e.g. a `usize` over 4 billion was encountered on a 32-bit machine).
+    WordSizeTooSmall,
 }
-pub use deserialize_error::DeserializeError;
+
+impl Display for DeserializeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match *self {
+            Self::Invalid => f.write_str("invalid etag"),
+            Self::WordSizeTooSmall => f.write_str("word size is too small"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+#[cfg_attr(doc_nightly, doc(cfg(feature = "std")))]
+impl std::error::Error for DeserializeError {}
 
 /// An error in [`Etag::from_bytes`].
 #[derive(Debug, Clone)]
@@ -228,20 +213,29 @@ pub trait Writer {
     }
 
     prim_writer_methods! {
-        write_u16 write_u16_var(encode_unsigned) u16,
-        write_u32 write_u32_var(encode_unsigned) u32,
-        write_u64 write_u64_var(encode_unsigned) u64,
-        write_u128 write_u128_var(encode_unsigned) u128,
-        write_i16 write_i16_var(encode_signed) i16,
-        write_i32 write_i32_var(encode_signed) i32,
-        write_i64 write_i64_var(encode_signed) i64,
-        write_i128 write_i128_var(encode_signed) i128,
-        // TODO: usize/isize
+        write_u16 write_u16_var(varint::encode_unsigned) u16,
+        write_u32 write_u32_var(varint::encode_unsigned) u32,
+        write_u64 write_u64_var(varint::encode_unsigned) u64,
+        write_u128 write_u128_var(varint::encode_unsigned) u128,
+        write_i16 write_i16_var(varint::encode_signed) i16,
+        write_i32 write_i32_var(varint::encode_signed) i32,
+        write_i64 write_i64_var(varint::encode_signed) i64,
+        write_i128 write_i128_var(varint::encode_signed) i128,
+    }
+
+    /// Write a `usize` using a variable-width encoding. The value is treated as a `u64`.
+    fn write_usize_var(&mut self, value: usize) {
+        self.write_u64_var(value as u64);
+    }
+
+    /// Write an `isize` using a variable-width encoding. The value is treated as an `i64`.
+    fn write_isize_var(&mut self, value: isize) {
+        self.write_i64_var(value as i64);
     }
 }
 
 macro_rules! prim_writer_methods {
-    ($($write_type:ident $write_type_var:ident($encode:ident) $type:ident,)*) => { $(
+    ($($write_type:ident $write_type_var:ident($encode:expr) $type:ident,)*) => { $(
         #[doc = concat!("Write a fixed-width `", stringify!($type), "` in little-endian.")]
         fn $write_type(&mut self, value: $type) {
             self.write_bytes(&value.to_le_bytes());
@@ -251,7 +245,7 @@ macro_rules! prim_writer_methods {
         /// See the docs of [`Writer`] for details on how this works.
         fn $write_type_var(&mut self, value: $type) {
             if self.use_varint() {
-                varint::$encode(self, value);
+                $encode(self, value);
             } else {
                 self.$write_type(value);
             }
@@ -314,10 +308,7 @@ impl<'buf> Reader<'buf> {
 
     /// Read a slice of bytes from the reader.
     pub fn read_bytes(&mut self, n: usize) -> Result<&'buf [u8], DeserializeError> {
-        let buf = self
-            .remaining()
-            .get(..n)
-            .ok_or_else(DeserializeError::nonspecific)?;
+        let buf = self.remaining().get(..n).ok_or(DeserializeError::Invalid)?;
         self.consume(n);
         Ok(buf)
     }
@@ -348,7 +339,16 @@ impl<'buf> Reader<'buf> {
         read_i32 read_i32_var(decode_signed) i32,
         read_i64 read_i64_var(decode_signed) i64,
         read_i128 read_i128_var(decode_signed) i128,
-        // TODO: usize/isize
+    }
+
+    /// Read a `usize` using a variable-width encoding. The value is treated as a `u64`.
+    pub fn read_usize_var(&mut self) -> Result<usize, DeserializeError> {
+        usize::try_from(self.read_u64_var()?).map_err(|_| DeserializeError::WordSizeTooSmall)
+    }
+
+    /// Read an `isize` using a variable-width encoding. The value is treated as an `i64`.
+    pub fn read_isize_var(&mut self) -> Result<isize, DeserializeError> {
+        isize::try_from(self.read_i64_var()?).map_err(|_| DeserializeError::WordSizeTooSmall)
     }
 }
 
@@ -417,7 +417,7 @@ mod varint {
             reader.read_exact(bytes.as_mut())?;
             T::from_le_bytes(bytes)
         } else {
-            return Err(DeserializeError::nonspecific());
+            return Err(DeserializeError::Invalid);
         };
         Ok(res)
     }
