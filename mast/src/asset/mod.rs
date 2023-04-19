@@ -29,10 +29,21 @@ pub trait Asset<'c>: Sized {
     {
         ensure_asset(Then::new(self, f))
     }
+
+    /// Map the output of this asset with a function.
+    fn map<O, F>(self, f: F) -> Map<Self, F>
+    where
+        F: FnOnce(Self::Output) -> O,
+    {
+        ensure_asset(Map::new(self, f))
+    }
 }
 
 mod then;
 pub use then::Then;
+
+mod map;
+pub use map::Map;
 
 /// Helper trait for generating the final result of an [`Asset`].
 /// Returned by [`Asset::update`].
