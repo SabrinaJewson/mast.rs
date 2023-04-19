@@ -16,37 +16,22 @@ impl<A: Debug, F> Debug for Then<A, F> {
     }
 }
 
-impl<A, F, InnerEtag, InnerOutput> Asset for Then<A, F>
+impl<'c, A1, A2, F> Asset<'c> for Then<A1, F>
 where
-    A: Asset,
-    F: for<'cx, 'e> FnOnce1<Tracked<A::Generator<'cx, 'e>>>,
-    for<'cx, 'e> <F as FnOnce1<Tracked<A::Generator<'cx, 'e>>>>::Output:
-        Asset<Etag = InnerEtag, Output = InnerOutput>,
-    InnerEtag: Etag,
+    A1: Asset<'c>,
+    F: FnOnce(Tracked<A1::Generator>) -> A2,
+    A2: Asset<'c>,
 {
-    type Etag = (A::Etag, InnerEtag);
-    type Output = InnerOutput;
-    type Generator<'cx, 'e> =
-        <<F as FnOnce1<Tracked<A::Generator<'cx, 'e>>>>::Output as Asset>::Generator<'cx, 'e>;
-    fn update<'cx, 'e>(
-        self,
-        cx: Context<'cx>,
-        etag: &'e mut Self::Etag,
-    ) -> Tracked<Self::Generator<'cx, 'e>> {
+    type Etag = (A1::Etag, A2::Etag);
+    type Output = A2::Output;
+    type Generator = A2::Generator;
+    fn update(self, cx: Context<'c>, etag: &'c mut Self::Etag) -> Tracked<Self::Generator> {
         (self.f)(self.asset.update(cx, &mut etag.0)).update(cx, &mut etag.1)
     }
 }
 
-pub trait FnOnce1<P1>: FnOnce(P1) -> <Self as FnOnce1<P1>>::Output {
-    type Output;
-}
-impl<P1, O, F: FnOnce(P1) -> O> FnOnce1<P1> for F {
-    type Output = O;
-}
-
 use super::Asset;
 use super::Context;
-use crate::Etag;
 use crate::Tracked;
 use core::fmt;
 use core::fmt::Debug;

@@ -1,7 +1,7 @@
 //! The [`Asset`] trait.
 
 /// A step in a build process.
-pub trait Asset: Sized {
+pub trait Asset<'c>: Sized {
     /// An asset’s etag, analagous to the `ETag` header found in HTTP,
     /// is a fingerprint of the `Output` and sideeffects —
     /// a short piece of data such that identical etags imply identical full data
@@ -12,38 +12,22 @@ pub trait Asset: Sized {
     type Output;
 
     /// Type used to generate the final result of an asset. Returned by [`Self::update`].
-    type Generator<'cx, 'e>: Generator<Output = Self::Output>;
+    type Generator: Generator<Output = Self::Output>;
 
     /// Check whether the etag is still accurate and generate the asset’s result.
-    fn update<'cx, 'e>(
-        self,
-        cx: Context<'cx>,
-        etag: &'e mut Self::Etag,
-    ) -> Tracked<Self::Generator<'cx, 'e>>;
+    fn update(self, cx: Context<'c>, etag: &'c mut Self::Etag) -> Tracked<Self::Generator>;
 
     /// Chain another asset after this one.
     ///
     /// The callback accepts a [`Tracked`]`<`[`Self::Generator`]`>`
     /// (i.e. the return value of [`Self::update`])
     /// and returns another asset.
-    fn then<InnerEtag, InnerOutput, F>(self, f: F) -> Then<Self, F>
+    fn then<A, F>(self, f: F) -> Then<Self, F>
     where
-        F: for<'cx, 'e> then::FnOnce1<Tracked<Self::Generator<'cx, 'e>>>,
-        for<'cx, 'e> <F as then::FnOnce1<Tracked<Self::Generator<'cx, 'e>>>>::Output:
-            Asset<Etag = InnerEtag, Output = InnerOutput>,
-        InnerEtag: Etag,
+        F: FnOnce(Tracked<Self::Generator>) -> A,
+        A: Asset<'c>,
     {
         ensure_asset(Then::new(self, f))
-    }
-
-    /// Like [`Self::then`], but has better type inference
-    /// for the case when the function’s return type doesn’t borrow from its input type.
-    fn then_fixed<A, F>(self, f: F) -> Then<Self, F>
-    where
-        F: for<'cx, 'e> FnOnce(Tracked<Self::Generator<'cx, 'e>>) -> A,
-        A: Asset,
-    {
-        ensure_asset(self.then::<A::Etag, A::Output, F>(f))
     }
 }
 
@@ -72,7 +56,7 @@ impl<O, F: FnOnce() -> O> Generator for F {
 pub mod context;
 pub use context::Context;
 
-fn ensure_asset<T: Asset>(value: T) -> T {
+fn ensure_asset<'c, T: Asset<'c>>(value: T) -> T {
     value
 }
 
